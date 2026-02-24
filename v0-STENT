@@ -1,0 +1,3007 @@
+```sql 
+WITH medecin_specialite AS (
+    SELECT DISTINCT
+        referring_doctor_formatted_fullname AS med,
+        CASE
+            WHEN LEFT(referring_doctor_firstname,6) IN (
+                                                        'Barbar','Dautel','Dederi','Detamm','Maschi','Lozano'
+                )
+                THEN 'CHIR MAIN'
+            ELSE referring_doctor_specialty
+            END AS specialite_medecin
+    FROM apigem_clp.clinical_patient_stay
+),
+     articles_par_sejour AS(
+         SELECT
+             sp.stay_number AS code_sejour,
+             fo.surgical_procedure_name AS Intervention,
+             DATE_FORMAT(DATE(s.surgery_date), '%Y-%m-%d') AS DOP,
+
+             #    s.identifier AS Identifier,
+             so.full_name AS operateur,
+
+             ms.specialite_medecin AS specialite_medecin,
+             fo.surgical_specialty_name AS specialite_acte,
+
+             #    si.id,
+             #    si.versioned_provider_article_id,
+             vpa.article_type_key AS `Type article`,
+
+             CASE
+                 WHEN vpa.article_type_key = 'MEDICAL_DEVICE' THEN
+                     CASE
+                         -- INTRODUCTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'INTRO%'
+                             OR UPPER(vpa.long_description) LIKE 'BRITE TIP%'
+                             OR UPPER(vpa.long_description) LIKE 'LHP%INTRODUCTOR%'
+                             OR UPPER(vpa.long_description) LIKE 'DESILET%'
+                             OR UPPER(vpa.long_description) IN ('401635','401735','402605','402606','402607','402608',
+                                                                '402610')
+                             OR UPPER(vpa.long_description) LIKE 'FLEXOR%INTRODUCTEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'FLEXOR%'
+                             OR UPPER(vpa.long_description) LIKE 'CHECK-FLO%' THEN 'INTRODUCTEUR'
+
+                         -- Fils guides coronariens / interventionnels
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE '%FIL% %GUIDE'
+                                      OR UPPER(vpa.long_description) LIKE '%FILGUIDE'
+                                      OR UPPER(vpa.long_description) LIKE 'FIL% GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE '%ASAHI%FIL%GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE 'ROTAWIRE%'
+                                      OR UPPER(vpa.long_description) LIKE 'FICHE%CATHETER%GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE 'FICHE%GUIDE%PRESSION%'
+                                      OR UPPER(vpa.long_description) LIKE 'MERIT%MAP550%'
+                                      OR UPPER(vpa.long_description) LIKE 'DGW%'
+                                      OR UPPER(vpa.long_description) LIKE 'CORDIS%'
+                                      OR UPPER(vpa.long_description) LIKE 'FIL%GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE 'GUIDE%WIRE%'
+                                      OR UPPER(vpa.long_description) LIKE 'PIN%VIS%TORQUEUR%'
+                                      OR UPPER(vpa.long_description) LIKE 'OVERTUBE%'
+                                      OR UPPER(vpa.long_description) LIKE 'ROSEN%GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE 'GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE 'VISTA%BRITE%TIP%'
+                                      OR UPPER(vpa.long_description) LIKE 'SPARTACORE%GUIDE%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%PROTECTION%BIOPSIE%'
+                             THEN 'FIL GUIDE/GUIDE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%INTRO%'
+                             AND UPPER(vpa.long_description) LIKE '%GUIDE%'
+                             THEN 'INTRODUCTEUR + FIL GUIDE'
+
+                         -- Catheter
+                         WHEN (UPPER(vpa.long_description) LIKE 'CATH%'
+                             OR UPPER(vpa.long_description) LIKE 'FLEXIMA%'
+                             OR UPPER(vpa.long_description) LIKE 'BD% INSYTE%'
+                             OR UPPER(vpa.long_description) LIKE 'SHOCKWAVE%'
+                             OR UPPER(vpa.long_description) LIKE 'CARTHE%'
+                             OR UPPER(vpa.long_description) LIKE 'VENFLON%'
+                             OR UPPER(vpa.long_description) LIKE 'ATHERECTOMY%'
+                             OR UPPER(vpa.long_description) LIKE 'CHIBA% ECHO% AIG%'
+                             OR UPPER(vpa.long_description) LIKE 'CHOICE% PT%'
+                             OR UPPER(vpa.long_description) LIKE 'IMPULSE%'
+                             OR UPPER(vpa.long_description) LIKE 'INSYTE%'
+                             OR UPPER(vpa.long_description) LIKE 'GUIDEZILLA%'
+                             OR UPPER(vpa.long_description) LIKE 'TEMPO%'
+                             OR UPPER(vpa.long_description) LIKE 'DXTERITY%'
+                             OR UPPER(vpa.long_description) LIKE 'CORSAIR%'
+                             OR UPPER(vpa.long_description) LIKE 'DREAMTOME%'
+                             OR UPPER(vpa.long_description) LIKE 'EAGLE%EYE%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'FICHE%LUMEN%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'JETSTREAM%XC%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'NC%EMERGE%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'OPTICROSS%BAGLESS%CORONAIRE'
+                             OR UPPER(vpa.long_description) LIKE 'PACEL%'
+                             OR UPPER(vpa.long_description) LIKE 'LIFECATH%MIDLINE%'
+                             OR UPPER(vpa.long_description) LIKE 'MICRO%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'VALVED%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'PASSEO-35%XEO%'
+                             OR UPPER(vpa.long_description) LIKE 'FINECROSS%CM%'
+                             OR UPPER(vpa.long_description) LIKE 'BOOSTING%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE 'CXI%'
+                             OR UPPER(vpa.long_description) LIKE 'TELESCOPE%GUIDE%'
+                             OR UPPER(vpa.long_description) LIKE 'TOUR%GUIDE%'
+                             OR UPPER(vpa.long_description) LIKE 'SUPER%TORQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'SUPERTORQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'ASC018135%'
+                             OR UPPER(vpa.long_description) LIKE '%451401%'
+                             OR UPPER(vpa.long_description) LIKE '%451415%'
+                             OR UPPER(vpa.long_description) LIKE '%451501%'
+                             OR UPPER(vpa.long_description) LIKE '%451504%'
+                             OR UPPER(vpa.long_description) LIKE '%451515%'
+                             OR UPPER(vpa.long_description) LIKE '%451544%'
+                             OR UPPER(vpa.long_description) LIKE '%451557%'
+                             OR UPPER(vpa.long_description) LIKE 'FOGARTY%CATH%'
+                             OR UPPER(vpa.long_description) LIKE 'CERTOFIX%DUO%'
+                             OR UPPER(vpa.long_description) LIKE 'JELCO%18G%'
+                             OR UPPER(vpa.long_description) LIKE 'OLYMPUS%CATH%'
+                             OR UPPER(vpa.long_description) LIKE 'SONDE%VARICE%CLOSUREFAST%'
+                             OR UPPER(vpa.long_description) LIKE 'CODA%'
+                             OR UPPER(vpa.long_description) LIKE 'CATHETER%')
+                             AND UPPER(vpa.long_description) NOT LIKE '%HP9481E%'
+                             THEN 'CATHETER'
+
+                         -- TROCARTS
+                         WHEN UPPER(vpa.long_description) LIKE 'TROCARD%'
+                             OR UPPER(vpa.long_description) LIKE 'KII%FIRST%ENTRY%'
+                             OR UPPER(vpa.long_description) LIKE 'KII%TROCART%'
+                             OR UPPER(vpa.long_description) LIKE 'KIRSCHNER%BS012TT%'
+                             OR UPPER(vpa.long_description) LIKE 'TROCART%'
+                             OR UPPER(vpa.long_description) LIKE 'DUALPACK%'
+                             OR UPPER(vpa.long_description) LIKE 'ABORD%CTF33%'
+                             OR UPPER(vpa.long_description) LIKE 'ENDO%CLOSE%'
+                             OR UPPER(vpa.long_description) LIKE 'THORACOPORT%' THEN 'TROCART'
+
+
+                         -- BALLON
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%BALLON%'
+                                 OR UPPER(vpa.long_description) LIKE 'STERLING%H74939032504010%'
+                                 OR UPPER(vpa.long_description) LIKE 'CUTTING%BALLOON%'
+                                 OR UPPER(vpa.long_description) LIKE '%SCORING%')
+                                 AND UPPER(vpa.long_description) NOT LIKE '%SONDE%'
+                             )
+                             THEN 'BALLON'
+
+
+                         -- AGRAFEUSE
+                         WHEN UPPER(vpa.long_description) LIKE 'AGRAFEU%'
+                             OR UPPER(vpa.long_description) LIKE 'PROTACK%MM%'
+                             OR UPPER(vpa.long_description) LIKE 'PINCE%GCS40G%'
+                             OR UPPER(vpa.long_description) LIKE 'VISISTAT%AGRAFEUSE%'
+                             OR (UPPER(vpa.long_description) LIKE '%STAPLE%' AND UPPER(vpa.long_description) NOT LIKE 'CHARGEUR%')
+                             OR (UPPER(vpa.long_description) LIKE '%STAPPLE%' AND UPPER(vpa.long_description) NOT LIKE 'CHARGEUR%')
+                             OR (UPPER(vpa.long_description) LIKE 'AGRAF%COUPANTE%COURBE%')
+                             THEN 'AGRAFEUSE'
+
+                         -- AGRAFE
+                         WHEN UPPER(vpa.long_description) LIKE 'AGRAFE%' THEN 'AGRAFE'
+
+                         -- PROTECTION SONDE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE 'PROTECTION% SONDE%'
+                                 OR UPPER(vpa.long_description) LIKE 'COUVRE%SDE%'
+                                 OR UPPER(vpa.long_description) LIKE 'PROTECTION%PC1290%'
+                                 OR UPPER(vpa.long_description) LIKE 'COUVRE%SONDE%'
+                                 OR UPPER(vpa.long_description) LIKE 'KIT%COUVRE%SONDE%')
+                                 AND UPPER(vpa.long_description) NOT LIKE 'KIT%GUIDE%'
+                             )
+                             THEN 'PROTECTION SONDE'
+
+                         -- KIT BIOPSIE
+                         WHEN (UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND UPPER(vpa.long_description) LIKE '%BIOPSIE%')
+                             OR UPPER(vpa.long_description) LIKE '%610608%'
+                             THEN 'KIT BIOPSIE'
+
+
+                         -- AIGUILLE
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE 'AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'GRIPPER%'
+                                      OR UPPER(vpa.long_description) LIKE 'DM85099%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'SONOLONG%CURL%ECHO%'
+                                      OR UPPER(vpa.long_description) LIKE '%NEEDLE%'
+                                      OR UPPER(vpa.long_description) LIKE 'MERIT%ADVANCE'
+                                      OR UPPER(vpa.long_description) LIKE 'DN0200%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'ELECTRODE%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'FLEXOCRIN%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'PENCAN%'
+                                      OR UPPER(vpa.long_description) LIKE 'E14656%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'TUOHY%SONO%AIG%'
+                                      OR UPPER(vpa.long_description) LIKE 'STIMUPLEX%AIGUILLE%'
+                                      OR UPPER(vpa.long_description) LIKE 'EPITOME%UTAH%'
+                                      OR UPPER(vpa.long_description) LIKE 'ENDOPATH%PN150%'
+                                      OR UPPER(vpa.long_description) LIKE 'AIGUILLE%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE 'KIT%BIOPSIE%NEEDLE%'
+                             AND UPPER(vpa.long_description) NOT LIKE 'ELECTRODE%AIGUILLE%'
+                             AND UPPER(vpa.long_description) NOT LIKE '%E1552%'
+                             AND UPPER(vpa.long_description) NOT LIKE 'CHEMISE%'
+                             AND UPPER(vpa.long_description) NOT LIKE 'PIÈCE%MAIN%'
+
+                             THEN 'AIGUILLE'
+
+
+                         -- ELECTRODES
+                         WHEN UPPER(vpa.long_description) LIKE 'ELECTRODE%'
+                             OR UPPER(vpa.long_description) LIKE 'EXCEL%DISPOSABLE%'
+                             OR UPPER(vpa.long_description) LIKE 'SERFAS%ELECTRODE%'
+                             OR UPPER(vpa.long_description) LIKE 'KIT%ELECTRODE%'
+                             OR UPPER(vpa.long_description) LIKE 'EIC%5872-01%'
+                             OR UPPER(vpa.long_description) LIKE 'CAPTEURS%ENTROPIE%'
+                             OR UPPER(vpa.long_description) LIKE 'SONDE%EIC 5872-01%'
+                             OR UPPER(vpa.long_description) LIKE 'AIGUILLE%E1552%'
+                             OR UPPER(vpa.long_description) LIKE 'ELECT%AIGUILLE%E1552%'
+                             OR UPPER(vpa.long_description) LIKE 'ELECTRODES%' THEN 'ELECTRODES'
+
+                         -- PANSEMENT
+                         WHEN UPPER(vpa.long_description) LIKE 'PANS%'
+                             OR UPPER(vpa.long_description) LIKE 'URGOTUL%'
+                             OR UPPER(vpa.long_description) LIKE 'TELACOMP%'
+                             OR UPPER(vpa.long_description) LIKE 'TELASORB%'
+                             OR UPPER(vpa.long_description) LIKE '%PANSEMENT%'
+                             OR UPPER(vpa.long_description) LIKE 'COMFEEL%TRANSP%'
+                             OR UPPER(vpa.long_description) LIKE 'MELGISORB%BOITE%'
+                             OR UPPER(vpa.long_description) LIKE 'MELGISORB%BTE%'
+                             OR UPPER(vpa.long_description) LIKE 'MEPILEX%BORDER%'
+                             OR UPPER(vpa.long_description) LIKE 'COSMOPOR%BTE%'
+                             OR UPPER(vpa.long_description) LIKE 'ALGOSTERIL%'
+                             OR UPPER(vpa.long_description) LIKE 'CICAPLAIE%'
+                             OR UPPER(vpa.long_description) LIKE 'COMFEEL%'
+                             OR UPPER(vpa.long_description) LIKE 'OPSITE%'
+                             OR UPPER(vpa.long_description) LIKE 'MEPILEX%'
+                             OR UPPER(vpa.long_description) LIKE 'MEPITEL%'
+                             OR UPPER(vpa.long_description) LIKE 'MEPITEL%'
+                             OR UPPER(vpa.long_description) LIKE 'KIT%VIVANOMED%'
+                             OR UPPER(vpa.long_description) LIKE 'LEUKOMED%CONTROL%'
+                             OR UPPER(vpa.long_description) LIKE 'TEGADERM%'
+                             OR UPPER(vpa.long_description) LIKE '%PSMT%'
+                             OR UPPER(vpa.long_description) LIKE '%ALLEVYN%GENTLE%BORDER%'
+                             OR UPPER(vpa.long_description) LIKE '%AQUACEL%'
+                             OR UPPER(vpa.long_description) LIKE 'FILM%ADH%TEGADERM%'
+                             OR UPPER(vpa.long_description) LIKE 'TULLE%GRAS%'
+                             OR UPPER(vpa.long_description) LIKE 'FILM%ADHESIF%OPERFILM%'
+                             THEN 'PANSEMENT'
+
+                         -- BOL A CIMENT
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%BOLS%CIMENT%'
+                             THEN 'BOL A CIMENT'
+
+                         -- KIT SERINGUE
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%SERINGUE%' THEN 'SERINGUE'
+
+                         -- KIT PATIENT
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%PATIENT%'
+                                  )
+                             THEN 'KIT PATIENT'
+
+                         -- KIT ENDOCAVITAIRE
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%ALPINION%'
+                                      OR UPPER(vpa.long_description) LIKE '%ENDOCAVITAIRE%'
+                                  )
+                             THEN 'KIT ENDOCAVITAIRE'
+
+                         -- ECOUVILLON (inclut les kits écouvillons)
+                         WHEN
+                             UPPER(vpa.long_description) LIKE '%ECOUVILLON%'
+                                 OR (
+                                 UPPER(vpa.long_description) LIKE 'KIT%'
+                                     AND UPPER(vpa.long_description) LIKE '%ECOUVILLON%'
+                                 )
+                             THEN 'ECOUVILLON'
+
+
+                         -- KIT INTRODUCTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%INTRO%'
+                                  )
+                             THEN 'KIT INTRODUCTEUR'
+
+                         -- KIT ARTHOSCOPIE
+                         WHEN UPPER(vpa.long_description) LIKE '%KIT%'
+                             AND UPPER(vpa.long_description) LIKE '%FIRSTPASS%'
+                             THEN 'KIT ARTHROSCOPIE'
+
+
+                         -- KIT MANDRIN
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%MANDRIN%'
+                                  )
+                             THEN 'KIT MANDRIN'
+
+                         -- KIT MOUSSE NOIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%MOUSSE%'
+                                  )
+                             THEN 'KIT MOUSSE NOIRE'
+
+                         -- KIT LAVAGE PULSE
+                         WHEN (UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND UPPER(vpa.long_description) LIKE '%LAVAGE%PULSE%')
+                             OR UPPER(vpa.long_description) LIKE '%PULSAVAC%'
+                             OR UPPER(vpa.long_description) LIKE 'SYSTEME%LAVAGE%PULSE%'
+                             THEN 'KIT LAVAGE PULSE'
+
+                         -- KIT MICROPONCTION
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE 'KIT%'
+                                      OR UPPER(vpa.long_description) LIKE 'SET%'
+                                  )
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%MICROPONCTION%'
+                                      OR UPPER(vpa.long_description) LIKE '%MICROPUNCTURE%'
+                                      OR UPPER(vpa.long_description) LIKE '%SONOSITE%'
+                                  )
+                             THEN 'KIT MICROPONCTION'
+
+                         -- KIT PERICARDIOCENTESE
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%PERICARDIOCENTESE%'
+                                  )
+                             THEN 'KIT PERICARDIOCENTESE'
+
+                         -- KIT POUDRAGE
+                         WHEN UPPER(vpa.long_description) LIKE 'STERITALC%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%KIT%'
+                                  )
+                             THEN 'KIT POUDRAGE'
+
+                         -- KIT ORTHOPEDIE
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE 'KIT%'
+                                     OR UPPER(vpa.long_description) LIKE 'ACP%KIT%'
+                                 )
+                                 AND (
+                                 UPPER(vpa.long_description) LIKE '%BROCHE%'
+                                     OR UPPER(vpa.long_description) LIKE '%VISEE%CHONDRAL%'
+                                     OR UPPER(vpa.long_description) LIKE '%ANCRE%'
+                                     OR UPPER(vpa.long_description) LIKE '%ARTHREX%'
+                                     OR UPPER(vpa.long_description) LIKE '%FEMORAL%'
+                                 )
+                             THEN 'KIT ORTHOPEDIE'
+
+
+                         -- KIT ENDOSCOPIE
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE 'KIT%'
+                                     AND (
+                                     UPPER(vpa.long_description) LIKE '%ENDO%'
+                                         OR UPPER(vpa.long_description) LIKE '%OESOPHAGIENNES%'
+                                         OR UPPER(vpa.long_description) LIKE '%GPE%'
+                                         OR UPPER (vpa.long_description) LIKE '%ALPINION%'
+                                     )
+                                 )
+                                 OR
+                             (
+                                 UPPER(vpa.long_description) LIKE 'LIGATEUR%'
+                                     AND UPPER(vpa.long_description) LIKE '%VARICE%'
+                                 )
+                             THEN 'KIT ENDOSCOPIE'
+
+                         -- KIT VASCULAIRE
+                         WHEN (UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                   UPPER(vpa.long_description) LIKE '%OSCAR%'
+                                       OR UPPER(vpa.long_description) LIKE '%VASCULAIRE%'
+                                       OR UPPER(vpa.long_description) LIKE '%CLOSUREFAST%'
+                                   )
+                                  )
+                             OR (
+                                  UPPER(vpa.long_description) LIKE '%PACK%'
+                                      AND UPPER(vpa.long_description) LIKE '%ENDOVEINEUX%'
+                                  )
+                             THEN 'KIT VASCULAIRE'
+
+
+                         -- KIT ANGIO
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE 'KIT%'
+                                     AND (UPPER(vpa.long_description) LIKE '%ANGIO%'
+                                     OR UPPER(vpa.long_description) LIKE '%PTCA%'
+                                     )
+                                 )
+                                 OR UPPER(vpa.long_description) LIKE 'ANGIODROID%'
+                                 OR UPPER(vpa.long_description) LIKE 'ANGIOJET%'
+                                 OR UPPER(vpa.long_description) LIKE 'COLONIC%FTRD%'
+                                 OR UPPER(vpa.long_description) LIKE '%MAP352%'
+                             THEN 'KIT ANGIO'
+
+
+                         -- KIT UROLOGIE
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%URETERALE%'
+                                  )
+                             THEN 'KIT UROLOGIE'
+
+
+                         -- KIT OPHTALMOLOGIE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE 'KIT%'
+                                 AND UPPER(vpa.long_description) LIKE '%RETIJET%')
+
+                                 OR (UPPER(vpa.long_description) LIKE 'PACK%'
+                                 AND (UPPER(vpa.long_description) LIKE '%RETINE%'
+                                     OR UPPER(vpa.long_description) LIKE '%PHACO%'
+                                     OR UPPER(vpa.long_description) LIKE '%SE5523WV%'
+                                     OR UPPER(vpa.long_description) LIKE '%SE5525WV%'
+                                     OR UPPER(vpa.long_description) LIKE '%IVT%401421%'))
+
+                                 OR (UPPER(vpa.long_description) LIKE 'KIT%'
+                                 AND UPPER(vpa.long_description) LIKE '%IVT%')
+                             )
+                             THEN 'KIT OPHTALMOLOGIE'
+
+
+
+                         -- KIT PROCEDURE RAFAELO
+                         WHEN UPPER(vpa.long_description) LIKE 'PACK%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%RAFAELO%'
+                                  )
+                             THEN 'KIT PROCEDURE RAFAELO'
+
+                         -- KIT
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT%' THEN 'KIT'
+
+                         -- PLATEFORME
+                         WHEN UPPER(vpa.long_description) LIKE 'PLATEFORME%GELPOINT%' THEN 'PLATEFORME GYNECO'
+
+                         -- VIS
+                         WHEN UPPER(vpa.long_description) LIKE 'VIS%'
+                             AND UPPER(vpa.long_description) NOT LIKE 'VISCO%'
+                             THEN 'VIS'
+
+                         -- MANDRIN
+                         WHEN UPPER(vpa.long_description) LIKE 'MANDRIN%' THEN 'MANDRIN'
+
+                         -- TUBE
+                         WHEN UPPER(vpa.long_description) LIKE 'TUBE%'
+                             OR UPPER(vpa.long_description) LIKE 'OLYMPUS%TUB%'
+                             OR UPPER(vpa.long_description) LIKE '1016010%'
+                             THEN 'TUBE'
+
+                         -- CROCHET
+                         WHEN UPPER(vpa.long_description) LIKE 'CROCHET%ECART%'
+                             OR UPPER(vpa.long_description) LIKE 'CROCHET%'
+                             THEN 'CROCHET'
+
+                         -- ECARTEUR PROTECTEUR
+                         WHEN  UPPER(vpa.long_description) LIKE '%ALEXIS%'
+                             OR UPPER(vpa.long_description) LIKE '%LINA%SEASTAR%'
+                             OR UPPER(vpa.long_description) LIKE '%SEA%STAR%'
+                             OR UPPER(vpa.long_description) LIKE '%ECART%C8302%'
+                             OR UPPER(vpa.long_description) LIKE '%PROTECTEUR%HR004%'
+                             OR UPPER(vpa.long_description) LIKE '%ECART%ANNEAU%'
+                             THEN 'ECARTEUR/PROTECTEUR'
+
+                         -- ECARTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'ECART%' THEN 'ECARTEUR'
+
+                         -- PROTECTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'PROTECTEUR%' THEN 'PROTECTEUR'
+
+                         -- RETRACTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'RETRACTEUR%'
+                             OR UPPER(vpa.long_description) LIKE '%RETRACT%'THEN 'RETRACTEUR'
+
+                         -- ANNEAU
+                         WHEN UPPER(vpa.long_description) LIKE 'ANNEAU%' THEN 'ANNEAU'
+
+                         -- DISPOSITIF SUPRAGLOTTIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%DISPOSITIF%SUPRAGLOTTIQUE%'
+                             THEN 'DISPOSITIF SUPRAGLOTTIQUE'
+
+                         -- CYSTOTOME
+                         WHEN UPPER(vpa.long_description) LIKE 'CYSTOTOME%'
+                             OR UPPER(vpa.long_description) LIKE 'CYSTITOME%'
+                             THEN 'CYSTOTOME'
+
+                         -- ACCESSOIRE
+                         WHEN UPPER(vpa.long_description) LIKE 'AIR%TUBING%'
+                             OR UPPER(vpa.long_description) LIKE 'VL2610%MANCHE%'
+                             THEN 'ACCESSOIRE'
+
+                         -- CONSOMMABLE POMPE
+                         WHEN UPPER(vpa.long_description) LIKE '%CONSOMMABLE%POMPE%'
+                             THEN 'CONSOMMABLE POMPE TUMESCENCE'
+
+                         -- TUBULURE (CAS PARTICULIER...)
+                         WHEN UPPER(vpa.long_description) LIKE 'ADAPTATEUR%OLYMPUS%CONNEXION%' THEN 'TUBULURE'
+
+                         -- RACCORD/CONNECTEUR/ADAPTATEUR
+                         WHEN ((UPPER(vpa.long_description) LIKE 'RACCORD%'
+                             OR UPPER(vpa.long_description) LIKE 'CONNECTEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'ADAPTATEUR%'
+                             OR UPPER(vpa.long_description) LIKE '%NCE105A%')
+                             AND UPPER(vpa.long_description) NOT LIKE 'ADAPTATEUR%OLYMPUS%CONNEXION%')
+                             THEN 'RACCORD/CONNECTEUR'
+
+
+                         -- EVACUATEUR COPEAUX
+                         WHEN (UPPER(vpa.long_description) LIKE 'EVACUATEUR%'
+                             AND UPPER(vpa.long_description) LIKE '%COPEAUX%')
+                             OR UPPER(vpa.long_description) LIKE '%POIRE%EVACUATEUR%'
+                             THEN 'EVACUATEUR COPEAUX'
+
+                         -- /MASQUE OXYGENE
+                         WHEN UPPER(vpa.long_description) LIKE 'LUNETTES%OXYGENE%'
+                             OR UPPER(vpa.long_description) LIKE 'LUNETTE%OXYGENE%'
+                             OR UPPER(vpa.long_description) LIKE 'MASQUE%OXYGENE%'
+                             THEN 'LUNETTE/MASQUE OXYGENE'
+
+
+                         -- STENT
+                         WHEN UPPER(vpa.long_description) LIKE 'STENT%'
+                             OR UPPER(vpa.long_description) LIKE 'PASSEO%XEO'THEN 'STENT'
+
+                         -- SPATULE
+                         WHEN UPPER(vpa.long_description) LIKE 'SPATULE%' THEN 'SPATULE'
+
+                         -- INSTRUMENT MEDICAUX
+                         WHEN (UPPER(vpa.long_description) LIKE 'DISPOSITIF%'
+                             OR UPPER(vpa.long_description) LIKE 'HAND%CONTROLLER%'
+                             OR UPPER(vpa.long_description) LIKE 'LIGASURE%'
+                             OR UPPER(vpa.long_description) LIKE 'CROCHET%MONOPOLAIRE%'
+                             OR UPPER(vpa.long_description) LIKE 'CAUTERE%'
+                             OR UPPER(vpa.long_description) LIKE 'HEMOSPRAY%'
+                             OR UPPER(vpa.long_description) LIKE 'OSTEOAUGER%'
+                             OR UPPER(vpa.long_description) LIKE 'DILATATEUR%URETERAL%'
+                             OR UPPER(vpa.long_description) LIKE '%MARKER%BUBBLE%'
+                             OR UPPER(vpa.long_description) LIKE '%NIVEAU%BULLE%'
+                             OR UPPER(vpa.long_description) LIKE '%POINTE%MANCHON%'
+                             OR UPPER(vpa.long_description) LIKE 'SERINGUE%SAFE%GUARD%'
+                             OR UPPER(vpa.long_description) LIKE 'VISCOJECT%'
+                             OR UPPER(vpa.long_description) LIKE 'INJECTEUR%OPHTALMO%')
+                             AND UPPER(vpa.long_description) NOT LIKE '%LIGATURE%'
+                             THEN 'INSTRUMENTS MEDICAUX'
+
+                         -- TROUSEE
+                         WHEN UPPER(vpa.long_description) LIKE '%MINI%'
+                             AND UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND UPPER(vpa.long_description) LIKE '%PERIDUR%' THEN 'TROUSSE PERIDURALE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND UPPER(vpa.long_description) LIKE '%ANGIO%' THEN 'TROUSSE ANGIO'
+
+                         -- TROUSEE VASCULAIRE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                                 AND (
+                                  UPPER(vpa.long_description) LIKE '%SALLE%HYBRIDE%'
+                                      OR UPPER(vpa.long_description) LIKE '%ENDOVASCULAIRE%'
+                                      OR UPPER(vpa.long_description) LIKE '%VARICE%'
+                                  )
+                                 )
+                                 OR
+                             (UPPER(vpa.long_description) LIKE '%PACK%'
+                                 AND UPPER(vpa.long_description) LIKE '%VARICE%'
+                                 )
+                             )
+                             THEN 'TROUSSE VASCULAIRE'
+
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (UPPER(vpa.long_description) LIKE '%PACE-MAKER%'
+                                 OR UPPER(vpa.long_description) LIKE '%CAROTIDE%')
+                             THEN 'TROUSSE CARDIOLOGIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND UPPER(vpa.long_description) LIKE '%PLASTIQUE%'
+                             THEN 'TROUSSE CHIRURGIE PLASTIQUE'
+
+
+                         -- TROUSSE ORTHOPEDIE
+                         WHEN (UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (
+                                   UPPER(vpa.long_description) LIKE '%PIED%'
+                                       OR UPPER(vpa.long_description) LIKE '%MAIN%'
+                                       OR UPPER(vpa.long_description) LIKE '%VERTICALE%'
+                                       OR UPPER(vpa.long_description) LIKE '%GENOU%'
+                                       OR UPPER(vpa.long_description) LIKE '%EXTREMITE%'
+                                       OR UPPER(vpa.long_description) LIKE '%PTG%'
+                                       OR UPPER(vpa.long_description) LIKE '%PTH%'
+                                       OR UPPER(vpa.long_description) LIKE '%HANCHE%'
+                                   )
+                                  )
+                             OR (
+                                  UPPER(vpa.long_description) LIKE 'PACK%'
+                                      AND (
+                                      UPPER(vpa.long_description) LIKE '%PTH%'
+                                          OR UPPER(vpa.long_description) LIKE '%PTE%'
+                                          OR UPPER(vpa.long_description) LIKE '%PTG%'
+                                          OR UPPER(vpa.long_description) LIKE '%ARTHRO%'
+                                          OR UPPER(vpa.long_description) LIKE '%ORTHO%'
+                                          OR UPPER(vpa.long_description) LIKE '%MAIN%'
+                                      )
+                                  )
+                             THEN 'TROUSSE ORTHOPEDIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%ARTHRO%'
+                                      OR UPPER(vpa.long_description) LIKE '%LIGAMENTO%'
+                                      OR UPPER(vpa.long_description) LIKE '%EPAULE%'
+                                      OR UPPER(vpa.long_description) LIKE '%GENOU%'
+                                  )
+                             THEN 'TROUSSE ORTHOPEDIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (UPPER(vpa.long_description) LIKE '%TB30013CE%'
+                                 OR UPPER(vpa.long_description) LIKE '%TB9192CE%'
+                                 OR UPPER(vpa.long_description) LIKE '%CERVICALE%'
+                                 OR UPPER(vpa.long_description) LIKE '%ORL%'
+                                  )
+                             THEN 'TROUSSE ORL'
+
+                         -- TROUSSE UROLOGIE/GYNECOLOGIE
+                         WHEN (UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (
+                                   UPPER(vpa.long_description) LIKE '%RTUP%'
+                                       OR UPPER(vpa.long_description) LIKE '%RTU%'
+                                       OR UPPER(vpa.long_description) LIKE '%COELIO%'
+                                       OR UPPER(vpa.long_description) LIKE '%RTUV%'
+                                       OR UPPER(vpa.long_description) LIKE '%GYNECOLOGIE%'
+                                   )
+                                  )
+                             OR (
+                                  UPPER(vpa.long_description) LIKE 'PACK%'
+                                      AND UPPER(vpa.long_description) LIKE '%URO%'
+                                  )
+                             OR (
+                                  UPPER(vpa.long_description) LIKE 'DRAPAGE%'
+                                      AND UPPER(vpa.long_description) LIKE '%ES29496CE%'
+                                  )
+                             THEN 'TROUSSE UROLOGIE/GYNECOLOGIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (UPPER(vpa.long_description) LIKE '%COELIOSCOPIE%'
+                                 OR   UPPER(vpa.long_description) LIKE '%COELISCOPIE%')
+                             THEN 'TROUSSE COELIOSCOPIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND UPPER(vpa.long_description) LIKE '%LAPAROTOMIE%'
+                             THEN 'TROUSSE LAPAROTOMIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%PACK%'
+                             AND UPPER(vpa.long_description) LIKE '%DENTAIRE%'
+                             THEN 'TROUSSE STOMATOLOGIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (UPPER(vpa.long_description) LIKE '%PAROI%'
+                                 OR UPPER(vpa.long_description) LIKE '%INIVERS%'
+                                 OR UPPER(vpa.long_description) LIKE '%UNIVERS%'
+                                 OR UPPER(vpa.long_description) LIKE '%UNIVERSELLE%'
+                                 OR UPPER(vpa.long_description) LIKE '%BASE%'
+                                 OR UPPER(vpa.long_description) LIKE '%PETITE%INTERVENTION%'
+                                  ) THEN 'TROUSSE CHIRURGIE GENERALE'
+
+
+                         -- TROUSSE OPHTALMOGIE
+                         WHEN ( (UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             OR UPPER(vpa.long_description) LIKE '%PACK%')
+                             AND UPPER(vpa.long_description) LIKE '%CATARACTE%'
+                             AND UPPER(vpa.long_description) LIKE '%CASSETTE%' )
+                             THEN 'TROUSSE OPHTALMOLOGIE'
+
+                         -- TROUSSE OPHTALMOGIE
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (UPPER(vpa.long_description) LIKE '%OPHTALMO%'
+                                 OR UPPER(vpa.long_description) LIKE '%CATARACTE%')
+                             THEN 'TROUSSE OPHTALMOLOGIE'
+
+                         -- TROUSSE OPHTALMOGIE
+                         WHEN UPPER(vpa.long_description) LIKE '%PACK%'
+                             AND UPPER(vpa.long_description) LIKE '%CATARACTE%'
+                             THEN 'TROUSSE OPHTALMOLOGIE'
+
+
+                         WHEN UPPER(vpa.long_description) LIKE '%TROUSSE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%DERMATO%'
+                                  )
+                             THEN 'TROUSSE DERMATOLOGIE'
+
+                         -- PORGES
+                         WHEN UPPER(vpa.long_description) LIKE 'PORGES%'
+                             OR UPPER(vpa.long_description) LIKE '%EXN934%'
+                             OR UPPER(vpa.long_description) LIKE '%EXTRACTEUR%CALCUL%DORMIA%'
+                             THEN 'PORGES'
+
+                         -- EXTRACTEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'EXTRACTEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'EXTRACTEURS%'THEN 'EXTRACTEUR'
+
+                         -- VALVE
+                         WHEN UPPER(vpa.long_description) LIKE 'VALVE%' THEN 'VALVE'
+
+                         -- RONDELLE OCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE 'RONDELLE%OCULAIRE%' THEN 'RONDELLE OCULAIRE'
+
+                         -- OBTURATEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'OBTURATEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'BOUCHON%OBTU%'
+                             THEN 'OBTURATEUR'
+
+                         -- EMBOUT
+                         WHEN UPPER(vpa.long_description) LIKE 'EMBOUT%'
+                             OR UPPER(vpa.long_description) LIKE 'OLYMPUS%EMBOUT%'
+                             OR UPPER(vpa.long_description) LIKE 'CONSTELLATION%EMBOUT%'
+                             THEN 'EMBOUT'
+
+                         -- GANTS
+                         WHEN UPPER(vpa.long_description) LIKE 'GAMMEX%LATEX%'
+                             OR UPPER(vpa.long_description) LIKE 'GAMMEX%SENSOPRENE%'
+                             OR UPPER(vpa.long_description) LIKE 'GANT%'
+                             THEN 'GANTS CHIRURGICAUX'
+
+                         -- URETEROSCOPE
+                         WHEN UPPER(vpa.long_description) LIKE 'URETEROSCOPE%' THEN 'URETEROSCOPE'
+
+                         -- COMPTEUR AIGUIULLE
+                         WHEN UPPER(vpa.long_description) LIKE 'SYSTEME%COMPTEUR%AIGUILLE%'
+                             OR UPPER(vpa.long_description) LIKE 'BOITE%MAGNETIQUE%RECUP%AIG%'
+                             OR UPPER(vpa.long_description) LIKE 'BOITE%AIG%'
+                             THEN 'COMPTE-AIGUILLE'
+
+                         -- BANDAGE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDAGE%' THEN 'BANDAGE'
+
+                         -- TIGE
+                         WHEN UPPER(vpa.long_description) LIKE 'TIGE%'
+                             OR UPPER(vpa.long_description) LIKE 'VENOSTRIP%TIGE%'
+                             THEN 'TIGE'
+
+                         -- PIECE A MAIN
+                         WHEN UPPER(vpa.long_description) LIKE '%PIECE%MAIN%'
+                             OR UPPER(vpa.long_description) LIKE 'PIÈCE%MAIN%'
+                             OR UPPER(vpa.long_description) LIKE 'PINCE%VOYANT%'
+                             THEN 'PIECE A MAIN'
+
+
+                         WHEN UPPER(vpa.long_description) LIKE 'TUBULURE%ARTHROMPOMPE%' THEN 'CASSETTE'
+                         WHEN UPPER(vpa.long_description) LIKE 'TUBULURE%ARTHROPOMPE%' THEN 'CASSETTE'
+
+                         -- TUBULURE
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE 'TUBU%'
+                                      OR UPPER(vpa.long_description) LIKE 'JEU%TUBULURE%'
+                                      OR UPPER(vpa.long_description) LIKE 'LIGNE%'
+                                      OR UPPER(vpa.long_description) LIKE 'CASSETTE%0450000125%'
+                                      OR UPPER(vpa.long_description) LIKE 'CASSETTE%0450000125%'
+                                      OR UPPER(vpa.long_description) LIKE 'CATHE%HP9481E%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE 'TUBULURE%0450-000-100%'
+                             THEN 'TUBULURE'
+
+                         -- CASSETTE IRRIGATION
+                         WHEN UPPER(vpa.long_description) LIKE 'CASSETTE%'
+                             THEN 'CASSETTE'
+
+                         -- NECESSAIRE IRRIGATION/ASPIRATION
+                         WHEN UPPER(vpa.long_description) LIKE 'NECESSAIRE%IR%'
+                             OR UPPER(vpa.long_description) LIKE 'SYSTEME%ASPI%'
+                             OR UPPER(vpa.long_description) LIKE 'ASPIRATEUR%'
+                             THEN 'NECESSAIRE IRRIGATION/ASPIRATION'
+
+                         -- FOSSET
+                         WHEN UPPER(vpa.long_description) LIKE 'FOSSET%' THEN 'FOSSET'
+
+                         -- ANCRE
+                         WHEN UPPER(vpa.long_description) LIKE 'ANCRE%' THEN 'ANCRE'
+
+                         -- PILE
+                         WHEN UPPER(vpa.long_description) LIKE 'BATTERIE%'
+                             OR UPPER(vpa.long_description) LIKE 'PILE%'
+                             THEN 'BATTERIE RECHARGEABLE'
+
+                         -- SONDE UROLOGIE
+                         WHEN UPPER(vpa.long_description) LIKE 'SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%URETER%'
+                                 OR UPPER(vpa.long_description) LIKE '%FOLEY%'
+                                 OR UPPER(vpa.long_description) LIKE '%DUFOUR%'
+                                 OR UPPER(vpa.long_description) LIKE '%VESICA%'
+                                 OR UPPER(vpa.long_description) LIKE '%ROBERTS%'
+                                 OR UPPER(vpa.long_description) LIKE '%TIEMANN%'
+                                 OR UPPER(vpa.long_description) LIKE '%POLLACK%'
+                                 OR UPPER(vpa.long_description) LIKE '%SPEEDICATH%'
+                                 OR UPPER(vpa.long_description) LIKE '%DORMIA%'
+                                 OR UPPER(vpa.long_description) LIKE '%REUTER%'
+                                 OR UPPER(vpa.long_description) LIKE '%NOEVESSIE%'
+                                 OR UPPER(vpa.long_description) LIKE '%PROSTATIQUE%'
+                                 OR UPPER(vpa.long_description) LIKE '%JJ%'
+                                 OR UPPER(vpa.long_description) LIKE '%DILATATION%'
+                                 OR UPPER(vpa.long_description) LIKE '%RCJ110%'
+                                  )THEN 'SONDE UROLOGIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '1005'
+                             OR UPPER(vpa.long_description) LIKE '%124516%'
+                             OR UPPER(vpa.long_description) LIKE '%DORMIA%NO%TIP%'
+                             THEN 'SONDE UROLOGIE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%SDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%FOLEY%'
+                                 OR UPPER(vpa.long_description) LIKE '%DUFOUR%'
+                                 OR UPPER(vpa.long_description) LIKE '%PROSTATIQUE%'
+                                 OR UPPER(vpa.long_description) LIKE '%VESICALE%'
+                                 OR UPPER(vpa.long_description) LIKE '%URETERALE%'
+                                  )
+                             THEN 'SONDE UROLOGIE'
+
+
+                         WHEN UPPER(vpa.long_description) LIKE 'DORMIA%'
+                             AND UPPER(vpa.long_description) LIKE '%3F%'
+                             THEN 'SONDE UROLOGIE'
+
+                         -- SONDE / FIBRE LASER
+                         WHEN ( (UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%LASER%')
+                             OR (UPPER(vpa.long_description) LIKE '%FIBRE%'
+                                 AND UPPER(vpa.long_description) LIKE '%RINGLIGHT%')
+                             OR UPPER(vpa.long_description) LIKE 'FIBRE%LASER%'
+                             OR UPPER(vpa.long_description) LIKE 'LHP%BARE%FIBER%'
+                             OR UPPER(vpa.long_description) LIKE 'RINGLIGHT%FIBER%'
+                             )
+                             THEN 'SONDE/FIBRE LASER'
+
+                         -- SONDE CALIBRATION
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%CALIBRATION%' THEN 'SONDE DE CALIBRATION'
+
+                         -- SONDE LITHOTRIPSIE
+                         WHEN UPPER(vpa.long_description) LIKE 'SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%LITHOTRIPSIE%' THEN 'SONDE LITHOTRIPSIE'
+
+                         -- SONDE STIMULATION
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%STIMULATION%525603%' THEN 'SONDE STIMULATION'
+
+                         -- SONDE JEJUNALE
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%NASO%JEJUNALE%' THEN 'SONDE JEJUNALE'
+
+                         WHEN
+                             UPPER(vpa.long_description) LIKE '%SALEM%'
+                                 OR (
+                                 UPPER(vpa.long_description) LIKE '%SONDE%'
+                                     AND (
+                                     UPPER(vpa.long_description) LIKE '%NASO%'
+                                         OR UPPER(vpa.long_description) LIKE '%GAVAGE%'
+                                         OR UPPER(vpa.long_description) LIKE '%ALIM%'
+                                     )
+                                 ) THEN 'SONDE NASOGASTRIQUE'
+
+                         -- SONDE VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%SELECT%5F%'
+                                 OR UPPER(vpa.long_description) LIKE '%SIDEWINDER%'
+                                 OR UPPER(vpa.long_description) LIKE '%5F%FL4%'
+                                 OR UPPER(vpa.long_description) LIKE '%5F%MAP1%'
+                                 OR UPPER(vpa.long_description) LIKE '%ENTRAINEMENT%VIKING%5F%'
+                                  ) THEN 'SONDE VASCULAIRE/INTERVENTIONNEL'
+
+                         -- SONDE CARDIOLOGIQUE (fusion des deux règles)
+                         WHEN (UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%STIMULATEUR%'
+                                 OR UPPER(vpa.long_description) LIKE '%DECAPOLAIRE%DYNAMIC%'
+                                 OR UPPER(vpa.long_description) LIKE '%ORIENTABLE%'
+                                 OR UPPER(vpa.long_description) LIKE '%QUADRIPOLAIRE%XTREM%'))
+                             OR UPPER(vpa.long_description) LIKE 'STIMULATEUR%MONOPOLAIRE%'
+                             THEN 'SONDE CARDIOLOGIQUE'
+
+                         WHEN UPPER(vpa.long_description) LIKE 'SET%GASTROSTOMIE%'
+                             OR UPPER(vpa.long_description) LIKE 'SONDE%GASTROSTOMIE%'
+                             OR UPPER(vpa.long_description) LIKE 'FILAC%FISTULA%'
+                             OR UPPER(vpa.long_description) LIKE 'SONDE%FISTURA%'
+                             THEN 'SONDE DIGESTIVE'
+
+                         -- SONDE ABLATION
+                         WHEN (UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%ABLATION%'
+                                 OR UPPER(vpa.long_description) LIKE '%FiAPC%'))
+                             OR (UPPER(vpa.long_description) LIKE '%SDE%'
+                                 AND UPPER(vpa.long_description) LIKE '%APC%ARGON%')
+                             THEN 'SONDE ABLATION'
+
+                         -- 'SONDE ECHOGRAPHIE / DOPPLER CHIRURGICAL
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%ULTRA-SON%'
+                                  ) THEN 'SONDE ECHOGRAPHIE/DOPPLER CHIRURGICAL'
+
+                         -- SONDE  PIGTAIL
+                         WHEN ( (UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%PIGTAIL%')
+                             OR UPPER(vpa.long_description) LIKE '526510' )
+                             THEN 'SONDE PIGTAIL'
+
+                         -- SONDE RF
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%RF%FISTURA%'
+                                  ) THEN 'SONDE ABLATION RF'
+
+
+                         -- SONDE VITRECTOMIE
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND UPPER(vpa.long_description) LIKE '%VITRECTOMIE%'
+                             THEN 'SONDE VITRECTOMIE'
+
+                         -- SONDE VITRECTOMIE
+                         WHEN (UPPER(vpa.long_description) LIKE '%VITRECTOMY%'
+                             AND UPPER(vpa.long_description) LIKE '%PACK%')
+                             THEN 'SONDE VITRECTOMIE'
+
+
+                         -- REFERANCE FABRICANT PAS SONDE...
+                         WHEN UPPER(vpa.manufacturer_article_reference) = '1001-78A'
+                             AND UPPER(vpa.long_description) LIKE 'SONDE%TRACHEALE%PORTEX%' THEN 'DISPOSITIF FERMETURE'
+
+                         -- SONDE ASPIRATION RESPIRATOIRE / TRACHEALE
+                         WHEN (UPPER(vpa.long_description) LIKE '%SONDE%'
+                             AND (
+                                   UPPER(vpa.long_description) LIKE '%ASPI%'
+                                       OR UPPER(vpa.long_description) LIKE '%INTUB%'
+                                       OR UPPER(vpa.long_description) LIKE '%TRACHEAL%'
+                                       OR UPPER(vpa.long_description) LIKE '%TRACHEOTOMIE%'
+                                   ))
+                             OR UPPER(vpa.long_description) LIKE '%7054514%'
+                             THEN 'SONDE ASPIRATION RESPIRATOIRE/TRACHEALE'
+
+                         -- AUTRE SONDE
+                         WHEN UPPER(vpa.long_description) LIKE 'SONDE%' THEN 'SONDE'
+
+                         -- FILTRE
+                         WHEN UPPER(vpa.long_description) LIKE 'FILTRE%'
+                             OR UPPER(vpa.long_description) LIKE 'FLITRE%' THEN 'FILTRE'
+
+                         -- BLOQUEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'BLOQUEUR%' THEN 'BLOQUEUR DE FIL GUIDE'
+
+                         -- BLOQUEUR RX
+                         WHEN UPPER(vpa.long_description) LIKE 'SYSTEM%BLOQUEUR%RX%'
+                             OR UPPER(vpa.long_description) LIKE 'RX%BLOQUEUR%'
+                             THEN 'BLOQUEUR RX'
+
+                         -- IMPLANT
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT%' THEN 'IMPLANT'
+
+                         -- VITREOTOME
+                         WHEN UPPER(vpa.long_description) LIKE 'VITREOTOME%' THEN 'VITREOTOME'
+
+                         -- ATTELE
+                         WHEN UPPER(vpa.long_description) LIKE 'ATTELLE%'
+                             AND (UPPER(vpa.long_description) LIKE '%NASALE%'
+                                 OR UPPER(vpa.long_description) LIKE '%DOYL%')
+                             THEN 'ATTELLE NASALE'
+
+                         -- ATTELE
+                         WHEN UPPER(vpa.long_description) LIKE 'ATTELLE%'
+                             THEN 'ATTELLE'
+
+                         -- RETRACTEUR IRIS
+                         WHEN UPPER(vpa.long_description) LIKE 'RETRACTEUR%IRIS%'
+                             THEN 'RETRACTEUR OPHTAMOLOGIE'
+
+                         -- EPONGE HEMOSTATIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'EPONGE%HEMOSTATIQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'GELITASPON%'
+                             THEN 'EPONGE HEMOSTATIQUE'
+
+                         -- EPONGE
+                         WHEN UPPER(vpa.long_description) LIKE 'EPONGE%'
+                             OR UPPER(vpa.long_description) LIKE 'LANCETTE%'
+                             THEN 'EPONGE'
+
+                         -- GEL
+                         WHEN UPPER(vpa.long_description) LIKE 'GEL%'
+                             AND UPPER(vpa.long_description) LIKE '%URETRAL%'
+                             THEN 'GEL UROLOGIE'
+
+                         -- GEL
+                         WHEN UPPER(vpa.long_description) LIKE 'GEL%' THEN 'GEL'
+
+                         -- CARTOUCHE GAZ
+                         WHEN UPPER(vpa.long_description) LIKE 'GAZ%'
+                             AND UPPER(vpa.long_description) LIKE '%CARTOUCHE%'
+                             THEN 'CARTOUCHE GAZ'
+
+                         -- CARTOUCHE
+                         WHEN UPPER(vpa.long_description) LIKE 'CARTOUCHE%'
+                             OR UPPER(vpa.long_description) LIKE 'CART%MONARCH%'
+                             THEN 'CARTOUCHE'
+
+                         -- COMPRESSE
+                         WHEN (UPPER(long_description) LIKE 'compres%'
+                             OR UPPER(long_description) LIKE 'PANGEN%CM%'
+                             OR UPPER(long_description) LIKE 'COMP%NTIS%'
+                             OR UPPER(long_description) LIKE 'GAZE%COMP%'
+                             OR UPPER(long_description) LIKE '%COMPRESSE%'
+                             OR UPPER(long_description) LIKE 'METALLINE%COMPR%'
+                             OR UPPER(long_description) LIKE '10909'
+                             OR UPPER(long_description) LIKE '108'
+                             OR UPPER(long_description) LIKE '10939'
+                             OR UPPER(long_description) LIKE '113'
+                             OR UPPER(long_description) LIKE '217'
+                             OR UPPER(long_description) LIKE '411049'
+                             OR UPPER(long_description) LIKE '6022'
+                             OR UPPER(long_description) LIKE 'COMP%HEMOST%')
+                             AND UPPER(long_description) NOT LIKE '%TULLE%GRAS%'
+                             THEN 'COMPRESSE'
+
+                         -- TETE
+                         WHEN UPPER(vpa.long_description) LIKE 'TETE%' THEN 'TETE'
+
+                         -- TAMPON
+                         WHEN UPPER(vpa.long_description) LIKE '%TAMPON%'
+                             OR UPPER(vpa.long_description) LIKE '%MICROSPONGES%'
+                             OR UPPER(vpa.long_description) LIKE 'MECHE%ENDOTRACHEAL%'
+                             THEN 'TAMPON'
+
+                         -- MECHE
+                         WHEN ((UPPER(vpa.long_description) LIKE 'MECHE%'
+                             OR UPPER(vpa.long_description) LIKE 'PRO-OPHTA%'))
+                             AND UPPER(vpa.long_description) NOT LIKE 'MECHE%MEROCEL%'
+                             THEN 'MECHE'
+
+                         -- CHARGEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'CHARGEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'RECHARGE%GIA%'
+                             OR UPPER(vpa.long_description) LIKE 'RECHARGE%TA%'
+                             THEN 'CHARGEUR AGRAFEUSE'
+
+                         -- OTE AGRAFES
+                         WHEN UPPER(vpa.long_description) LIKE 'OTE%'
+                             AND UPPER(vpa.long_description) LIKE '%AGRAFES%'
+                             THEN 'OTE AGRAFES'
+
+                         -- JAMBIERE PROTECTION
+                         WHEN UPPER(vpa.long_description) LIKE 'JAMBIERE%' THEN 'JAMBIERE PROTECTION'
+
+                         -- BRAS PROTECTION
+                         WHEN UPPER(vpa.long_description) LIKE 'PROTEGE%'
+                             AND UPPER(vpa.long_description) LIKE '%BRAS%'
+                             THEN 'BRAS PROTECTION'
+
+
+                         -- ALESOIRS
+                         WHEN UPPER(vpa.long_description) LIKE '%ALESOIR%'
+                             THEN 'ALESOIR'
+
+                         -- CIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%WAX%'
+                             OR UPPER(vpa.long_description) LIKE 'CIRE%'
+                             THEN 'CIRE'
+
+                         -- GRATTOIR
+                         WHEN UPPER(vpa.long_description) LIKE 'GRATTOIR%' THEN 'GRATTOIR'
+
+                         -- PROTEGE DENTS
+                         WHEN UPPER(vpa.long_description) LIKE 'PROTEGE%DENT%' THEN 'PROTEGE DENTS'
+
+                         -- CACHE PERINEE
+                         WHEN UPPER(vpa.long_description) LIKE 'CACHE%'
+                             AND UPPER(vpa.long_description) LIKE '%PERINE%'
+                             THEN 'CACHE PERINE'
+
+                         -- CALE DENT
+                         WHEN UPPER(vpa.long_description) LIKE 'CALE%DENTS%' THEN 'CALE DENTS'
+
+                         -- CISEAUX
+                         WHEN UPPER(vpa.long_description) LIKE 'CISEAU%'
+                             OR UPPER(vpa.long_description) LIKE 'CISEAUX%' THEN 'CISEAUX'
+
+                         -- CASAQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'CASAQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'CASAQUE%ECLIPSE%'
+                             THEN 'CASAQUE'
+
+                         -- MULTIAPPLICATEUR CLIP
+                         WHEN UPPER(vpa.long_description) LIKE 'MULTIAPPLICATEUR%CLIP%' THEN 'APPLICATEUR A CLIPS MULTIPLES'
+
+                         -- CLIP
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE '%CLIP%'
+                                     OR UPPER(vpa.long_description) LIKE 'CLIP%'
+                                     OR UPPER(vpa.long_description) LIKE '%HEMOLOCK%'
+                                     OR UPPER(vpa.long_description) LIKE '%HEMOLOK%'
+                                 )
+                                 OR (
+                                 UPPER(vpa.long_description) LIKE '%BARETTES%'
+                                     AND UPPER(vpa.long_description) LIKE '%CLIP%'
+                                 )
+                                 OR (
+                                 UPPER(vpa.long_description) LIKE '%ENDO%'
+                                     AND UPPER(vpa.long_description) LIKE '%CLIP%'
+                                 )
+                             THEN 'CLIP'
+
+
+                         -- PROLONGATEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'PROLONG%'
+                             OR UPPER(vpa.long_description) LIKE 'RAMPE%PROLONGATEUR%'
+                             THEN 'PROLONGATEUR'
+
+
+
+                         -- BOL ou CUPULE + CIMENT
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%BOL%'
+                                 OR UPPER(vpa.long_description) LIKE '%CUPULE%')
+                                 AND UPPER(vpa.long_description) LIKE '%CIMENT%'
+                             )
+                             THEN 'BOL A CIMENT'
+
+
+                         -- CUPULE
+                         WHEN UPPER(vpa.long_description) LIKE 'CUPULE%'
+                             THEN 'CUPULE'
+
+                         -- BOL STERILE
+                         WHEN UPPER(vpa.long_description) LIKE 'BOL%'
+                             AND UPPER(vpa.long_description) LIKE '%STERILE%'
+                             THEN 'BOL STERILE'
+
+                         -- BROCHE
+                         WHEN UPPER(vpa.long_description) LIKE 'BROCHE%' THEN 'BROCHE'
+
+                         -- CRAYON DERMOGRAPHIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'CRAYON%DERMOGRAPHIQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'MARQUEUR%DERMO%'
+                             OR UPPER(vpa.long_description) LIKE 'MARQUEUR%PRE OP%'
+                             THEN 'CRAYON DERMOGRAPHIQUE'
+
+                         -- LENTILLE VITRECTOMIE
+                         WHEN UPPER(vpa.long_description) LIKE 'LENTILLE%SILICONE%'
+                             THEN 'LENTILLE VITRECTOMIE'
+
+                         -- CRAYON
+                         WHEN UPPER(vpa.long_description) LIKE 'CRAYON%' THEN 'CRAYON'
+
+                         -- BOUGIE
+                         WHEN UPPER(vpa.long_description) LIKE 'BOUGIE%'
+                             AND UPPER(vpa.long_description) LIKE '%OLIVAIRE%' THEN 'BOUGIE OLIVAIRE'
+
+                         -- COUVERTURE CHAUFFANTE
+                         WHEN UPPER(vpa.long_description) LIKE 'COUVERTURE%CHAUF%'
+                             OR UPPER(vpa.long_description) LIKE 'COUVERTURE%58501'
+                             THEN 'COUVERTURE CHAUFFANTE'
+
+                         -- COUVRE TABLE
+                         WHEN UPPER(vpa.long_description) LIKE 'COUVRE%TABLE%'
+                             OR UPPER(vpa.long_description) LIKE 'HOUSSE%MAYO%'
+                             OR UPPER(vpa.long_description) LIKE 'CHAMP%TABLE%'
+                             THEN 'COUVRE TABLE'
+
+                         -- VERRE 3 MIROIRS
+                         WHEN UPPER(vpa.long_description) LIKE 'VERRE%MIROIR%' THEN 'VERRE 3 MIROIRS'
+
+                         -- ESSUIE MAIN STERILE
+                         WHEN UPPER(vpa.long_description) LIKE 'ESSUIE%MAIN%' THEN 'ESSUIE MAIN STERILE'
+
+                         -- VESSEL LOOP / BOUCLE VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%VESSEL LOOP%'
+                             OR UPPER(vpa.long_description) LIKE '%SURGICAL LOOP%SILICONE%'
+                             OR UPPER(vpa.long_description) LIKE '%SURGILOOP%'
+                             OR UPPER(vpa.long_description) LIKE '%LAC%SUSPENSEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'MEDI%LOOP%'
+                             THEN 'VESSEL LOOP'
+
+                         -- DRAP
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE ' DRAP%'
+                                      OR UPPER(vpa.long_description) LIKE '%DRAPE%'
+                                      OR UPPER(vpa.long_description) LIKE 'CHAMP%'
+                                      OR UPPER(vpa.long_description) LIKE 'RAUCODRAPE%'
+                                      OR UPPER(vpa.long_description) LIKE 'IOBAN%'
+                                      OR UPPER(vpa.long_description) LIKE '2'
+                                      OR UPPER(vpa.long_description) LIKE 'STERIDRAP%'
+                                      OR UPPER(vpa.long_description) LIKE 'FILM%ADH%IOBAN%'
+                                      OR UPPER(vpa.long_description) LIKE 'FILM%ADH%OBERFILM%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%TABLE%'
+                             THEN 'CHAMP'
+
+
+                         -- FIL SUTURE
+                         WHEN UPPER(vpa.long_description) LIKE '%SUTURE%'
+                             OR UPPER(vpa.long_description) LIKE '%VICRYL%'
+                             OR UPPER(vpa.long_description) LIKE '%ETHIBOND%'
+                             OR UPPER(vpa.long_description) LIKE 'V-LOC%'
+                             OR UPPER(vpa.long_description) LIKE 'STRATAFIX%'
+                             OR UPPER(vpa.long_description) LIKE 'VLOC%'
+                             OR UPPER(vpa.long_description) LIKE 'PROLENE%'
+                             OR UPPER(vpa.long_description) LIKE 'MONO%PLUS%'
+                             OR UPPER(vpa.long_description) LIKE '%MONOCRYL%'
+                             OR UPPER(vpa.long_description) LIKE 'MERSILENE%F4503%'
+                             OR UPPER(vpa.long_description) LIKE 'PDS%CM%'
+                             OR UPPER(vpa.long_description) LIKE 'SURGITIE%LIGATING%LOOP%'
+                             OR UPPER(vpa.long_description) LIKE 'SOIE%NOIRE%'
+                             OR UPPER(vpa.long_description) LIKE 'OPTIME%TRESSE%RESORBABLE%'
+                             OR UPPER(vpa.long_description) LIKE 'ACIER%BRIN%'
+                             OR UPPER(vpa.long_description) LIKE '%MONOFIL%'
+                             OR UPPER(vpa.long_description) LIKE 'MCP3435G%'
+                             OR UPPER(vpa.long_description) LIKE 'MERSILENE%VERT%'
+                             OR UPPER(vpa.long_description) LIKE 'MERSILENE%AIG%'
+                             OR UPPER(vpa.long_description) LIKE 'NYLON%RUBAN%'
+                             OR UPPER(vpa.long_description) LIKE 'STERI STRIP%'
+                             OR UPPER(vpa.long_description) LIKE 'VCP1428E%POLYSORB%'
+                             OR UPPER(vpa.long_description) LIKE 'Z397H%PDS%'
+                             OR UPPER(vpa.long_description) LIKE 'Z398H%PDS%'
+                             OR UPPER(vpa.long_description) LIKE 'ETHILON%'
+                             OR UPPER(vpa.long_description) LIKE 'ASSUFIL%'
+                             OR UPPER(vpa.long_description) LIKE 'POLYSORB%'
+                             OR UPPER(vpa.long_description) LIKE 'PDS%PLUS%'
+                             OR UPPER(vpa.long_description) LIKE 'STERISTRIP%'
+                             OR UPPER(vpa.long_description) LIKE 'TICRON%'
+                             OR UPPER(vpa.long_description) LIKE 'FIL%PDS%'
+                             OR UPPER(vpa.long_description) LIKE 'FH LOOP%'
+                             OR UPPER(vpa.long_description) LIKE 'ETHICRIN%'
+                             OR UPPER(vpa.long_description) LIKE 'ENDOLOOP%EZ10C%'
+                             OR UPPER(vpa.long_description) LIKE 'ENDO%174301%'
+                             OR UPPER(vpa.long_description) LIKE 'FILBLOC%'
+                             OR UPPER(vpa.long_description) LIKE 'NYLON%ALCON%'
+                             OR UPPER(vpa.long_description) LIKE 'OPTIME%18S%'
+                             OR UPPER(vpa.long_description) LIKE 'MONOSYN%'
+                             OR UPPER(vpa.long_description) LIKE 'RUBAN%NYLON%'
+                             OR UPPER(vpa.long_description) LIKE 'DAFILON%'
+                             OR UPPER(vpa.long_description) LIKE 'FLEXOCRIN%DAFILON%'
+                             OR UPPER(vpa.long_description) LIKE 'COROLENE%AIG%'
+                             OR UPPER(vpa.long_description) LIKE 'PDP%CM%'
+                             OR UPPER(vpa.long_description) LIKE '8581'
+                             OR UPPER(vpa.long_description) LIKE '8807'
+                             OR UPPER(vpa.long_description) LIKE 'B7769%ETHILON%'
+                             OR UPPER(vpa.long_description) LIKE 'ENDOLOOP%BOUCLE%CM%'
+                             OR UPPER(vpa.long_description) LIKE 'F18%PROLENE%'
+                             OR UPPER(vpa.long_description) LIKE '%ETHILON%NOIR%'
+                             OR UPPER(vpa.long_description) LIKE '%MERSILENE%CM%'
+                             OR UPPER(vpa.long_description) LIKE '%ETHICRIN%CM%'
+                             OR UPPER(vpa.long_description) LIKE '%SOIE%NOIRE%'
+                             OR UPPER(vpa.long_description) LIKE '%FILAPEAU%'
+                             OR UPPER(vpa.long_description) LIKE '%MONOICRYL%'
+                             OR UPPER(vpa.long_description) LIKE 'SOIE%CM%'
+                             OR UPPER(vpa.long_description) LIKE '%ETHILON%CM%'
+                             OR UPPER(vpa.long_description) LIKE '%PROLENE%CM%'
+                             OR UPPER(vpa.long_description) LIKE '%PDS%DIAM%'
+                             OR UPPER(vpa.long_description) LIKE 'PFF2993H%'
+                             OR UPPER(vpa.long_description) LIKE 'X41005%TICRON%'
+                             THEN 'FIL SUTURE'
+
+                         -- BRACELET
+                         WHEN UPPER(vpa.long_description) LIKE 'BRACELET%'
+                             OR UPPER(vpa.long_description) LIKE 'SAFEGUARD%RADIAL'
+                             OR UPPER(vpa.long_description) LIKE 'BRACELET%COMPRESSION%'
+                             OR UPPER(vpa.long_description) LIKE 'BRACELET%DE%COMPRESSION%'
+                             OR UPPER(vpa.long_description) LIKE '%BRACELET%'
+                             THEN 'BRACELET DE COMPRESSION'
+
+                         /*
+                         -- FERMETURE
+                         WHEN UPPER(vpa.long_description) LIKE 'FERMETURE%'
+                             OR UPPER(vpa.long_description) LIKE 'EXOSEAL%FERMETURE'
+                             OR UPPER(vpa.long_description) LIKE 'MEDI%LOOP%'
+                             OR UPPER(vpa.long_description) LIKE 'MPAK%'
+                             OR UPPER(vpa.long_description) LIKE 'PBT%CLOSURE%'
+                             OR UPPER(vpa.long_description) LIKE 'qwickable%C3MRMST4SA%'
+                             OR UPPER(vpa.long_description) LIKE 'SINGLE%LIGATING%'
+                             OR UPPER(vpa.long_description) LIKE 'SYSTEME PERCLOSE%'
+                             OR UPPER(vpa.long_description) LIKE 'ANGIOSEAL%'
+                             OR UPPER(vpa.long_description) LIKE 'SCANLAN%LOOP%'
+                             OR UPPER(vpa.long_description) LIKE 'VESSEL%SEALER%'
+                             OR UPPER(vpa.long_description) LIKE 'DISPOSITIF%LIGATURE%'
+                             OR UPPER(vpa.long_description) LIKE '%FERMETURE%'
+                 
+                             THEN 'DISPOSITIF FERMETURE'
+                 */
+
+                         WHEN (
+                             UPPER(vpa.long_description) LIKE 'FERMETURE%'
+                                 OR UPPER(vpa.long_description) LIKE 'EXOSEAL%FERMETURE'
+                                 OR UPPER(vpa.long_description) LIKE 'MPAK%'
+                                 OR UPPER(vpa.long_description) LIKE 'PBT%CLOSURE%'
+                                 OR UPPER(vpa.long_description) LIKE 'QWICKABLE%C3MRMST4SA%'
+                                 OR UPPER(vpa.long_description) LIKE 'SINGLE%LIGATING%'
+                                 OR UPPER(vpa.long_description) LIKE 'SYSTEME PERCLOSE%'
+                                 OR UPPER(vpa.long_description) LIKE 'ANGIOSEAL%'
+                                 OR UPPER(vpa.long_description) LIKE 'SCANLAN%LOOP%'
+                                 OR UPPER(vpa.long_description) LIKE 'VESSEL%SEALER%'
+                                 OR UPPER(vpa.long_description) LIKE 'DISPOSITIF%LIGATURE%'
+                                 OR UPPER(vpa.long_description) LIKE '%FERMETURE%'
+                             )
+                             THEN 'DISPOSITIF FERMETURE'
+
+                         -- JERSEY CHIRURGICAUX
+                         WHEN UPPER(vpa.long_description) LIKE 'JERSEY% CHIRURGICAL' THEN 'JERSEY CHIRURGICAUX'
+
+                         -- Autoforeuse
+                         WHEN UPPER(vpa.long_description) LIKE '%AUTOFOREUSE%' THEN 'AUTOFOREUSE'
+
+                         -- GONIOPRISME
+                         WHEN UPPER(vpa.long_description) LIKE '%GONIOPRISME%' THEN 'GONIOPRISME'
+
+                         -- FEUILLE
+                         WHEN UPPER(vpa.long_description) LIKE '%FEUILLE%SILICONE%' THEN 'FEUILLE SILICONE'
+
+                         -- GAINE CAMERA
+                         WHEN UPPER(vpa.long_description) LIKE 'GAINE%'
+                             AND UPPER(vpa.long_description) LIKE '%CAMERA%'
+                             THEN 'GAINE CAMERA'
+
+                         -- CONSOMMABLE ROBOT CHIRURGICAL DA VINCI
+                         WHEN
+                             UPPER(vpa.long_description) LIKE '%DA VINCI%'
+                                 OR UPPER(vpa.long_description) LIKE '%INTUITIVE SURGICAL%'
+                                 OR UPPER(vpa.long_description) LIKE '%ROBOT%CHIRURGICAL%'
+                                 OR (
+                                 UPPER(vpa.long_description) LIKE 'GAINE%'
+                                     AND vpa.manufacturer_article_reference = '400180'
+                                 )
+                             THEN 'CONSOMMABLE ROBOT CHIRURGICAL'
+
+
+
+                         -- GAINE
+                         WHEN UPPER(vpa.long_description) LIKE 'GAINE%'
+                             OR UPPER(vpa.long_description) LIKE 'CHEMISE%NANONEEDLE%'
+                             THEN 'GAINE'
+
+                         -- FEUILLE
+                         WHEN UPPER(vpa.long_description) LIKE 'ANUSCOPE%' THEN 'ANUSCOPE'
+
+                         -- SERINGUE
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE '%SERING%'
+                                      OR UPPER(vpa.long_description) LIKE '%DOUBLE SERINGUE%'
+                                      OR UPPER(vpa.long_description) LIKE 'STERIMARK%SERINGUE%'
+                                      OR UPPER(vpa.long_description) LIKE 'SERINGUE%CANULE%'
+                                      OR UPPER(vpa.long_description) LIKE 'MARQUEUR%GIS-46%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%COLLE%'
+                             AND UPPER(vpa.long_description) NOT LIKE '%INFLATION%'
+                             AND UPPER(vpa.long_description) NOT LIKE '%SAFE%GUARD%'
+                             THEN 'SERINGUE'
+
+                         -- CANNULE
+                         WHEN ( UPPER(vpa.long_description) LIKE 'CANNUL%'
+                             OR UPPER(vpa.long_description) LIKE '%CANUL%'
+                             OR UPPER(vpa.long_description) LIKE 'YANKAUER%'
+                             OR UPPER(vpa.long_description) LIKE '27511%'
+                             OR UPPER(vpa.long_description) LIKE 'ASPI%ELEPHANT%'
+                             OR UPPER(vpa.long_description) LIKE 'ELEFANT%PREMONTE%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%JOINT%'
+                             AND UPPER(vpa.long_description) NOT LIKE '%SERINGUE%'
+                             THEN 'CANULE'
+
+                         -- CANNULE
+                         WHEN (UPPER(vpa.long_description)) LIKE 'JOINT%CANULE%' THEN 'JOINT CANULE'
+
+                         -- THROMBINATOR
+                         WHEN UPPER(vpa.long_description) LIKE '%THROMBINATOR%' THEN 'THROMBINATOR'
+
+                         -- INFLATEUR
+                         WHEN UPPER(vpa.long_description) LIKE '%INFLATEUR%'
+                             OR UPPER(vpa.long_description) LIKE '%SERINGUE%INFLATION%'
+                             THEN 'INFLATEUR'
+
+
+                         -- CHEMISE
+                         WHEN UPPER(vpa.long_description) LIKE 'CHEMISE%TROCARD%'
+                             OR UPPER(vpa.long_description) LIKE 'CHEMISE%TROCART%'
+                             OR UPPER(vpa.long_description) LIKE 'CHEMISE%FILETEE%'
+                             THEN 'CHEMISE POUR TROCART'
+
+                         -- PROTHESE
+                         WHEN UPPER(vpa.long_description) LIKE 'ORIGIN%PS%' THEN 'PROTHESE'
+
+                         -- FLACON DRAINAGE
+                         WHEN UPPER(vpa.long_description) LIKE 'FLACON%DRAINAGE%'
+                             OR UPPER(vpa.long_description) LIKE 'DRAINOBAG%'
+                             OR UPPER(vpa.long_description) LIKE 'DRAINOFAST%'
+                             OR UPPER(vpa.long_description) LIKE 'DRAINA%ML%'
+                             OR UPPER(vpa.long_description) LIKE 'RESERVOIR%ML%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%DRAINAGE%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%URINE%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%URINAIRE%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%DIURESE%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%STOMIE%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%SENSURA%'
+                             OR UPPER(vpa.long_description) LIKE 'COLLECTEUR%URINE%'
+                             OR UPPER(vpa.long_description) LIKE 'MINI%DRAINOBAG%'
+                             OR UPPER(vpa.long_description) LIKE 'MINI%REDOVAC%'
+                             OR UPPER(vpa.long_description) LIKE 'SENSURA%MIO%'
+                             OR UPPER(vpa.long_description) LIKE 'MINI SET%REDON%DRAIN%'
+                             OR UPPER(vpa.long_description) LIKE 'SET%POST-OP%VID%'
+                             THEN 'FLACON/POCHE DE DRAINAGE'
+
+                         -- FLACON
+                         WHEN UPPER(vpa.long_description) LIKE 'FREELEX%'
+                             OR UPPER(vpa.long_description) LIKE 'FLACON%' THEN 'FLACON'
+
+                         -- COLLECTEUR TISSU
+                         WHEN UPPER(vpa.long_description) LIKE '%COLLECTEUR%TISSU%' THEN 'COLLECTEUR TISSU'
+
+                         -- COLLECTEUR
+                         WHEN UPPER(vpa.long_description) LIKE '%COLLECTEUR%'
+                             OR UPPER(vpa.long_description) LIKE '%BOUTEILLE%RECUEIL%'
+                             THEN 'COLLECTEUR'
+
+                         -- COLLE CUTANEE
+                         WHEN UPPER(vpa.long_description) LIKE 'COLLE%'
+                             OR UPPER(vpa.long_description) LIKE 'DERMABOND%COLLE%'
+                             OR UPPER(vpa.long_description) LIKE 'SURGIFLO%HEMOSTATIQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'LEUKOSAN%COLLE%'
+                             OR UPPER(vpa.long_description) LIKE 'IFABOND%COLLE%'
+                             OR UPPER(vpa.long_description) LIKE 'LIQUIBAND%'
+                             THEN 'COLLE CUTANEE'
+
+                         -- SOLUTION
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE 'SOLUTION%'
+                                      OR UPPER(vpa.long_description) LIKE '%NACL%'
+                                      OR UPPER(vpa.long_description) LIKE 'OMNIPAQUE%'
+                                      OR UPPER(vpa.long_description) LIKE 'PRODUIT%OMNIPAQUE%'
+                                      OR UPPER(vpa.long_description) LIKE 'OPTIRAY%ML%'
+                                      OR UPPER(vpa.long_description) LIKE 'MARQUEUR%ML%'
+                                      OR UPPER(vpa.long_description) LIKE '%FLACON%'
+                                      OR UPPER(vpa.long_description) LIKE '%EYEFILL%'
+                                      OR UPPER(vpa.long_description) LIKE '%BSS%POCHE%'
+                                      OR UPPER(vpa.long_description) LIKE '%BSS%CENTURION%'
+                                      OR UPPER(vpa.long_description) LIKE '%INDIGO%CARMIN%'
+                                      OR UPPER(vpa.long_description) LIKE '%MONOBLUE%'
+                                      OR UPPER(vpa.long_description) LIKE '%COLORANT%RETINE%'
+                                      OR UPPER(vpa.long_description) LIKE '%DYE200%BLUE%'
+                                      OR UPPER(vpa.long_description) LIKE '%GLUCOSE%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%DRAINAGE%'
+                             AND UPPER(vpa.long_description) NOT LIKE '%IFABOND%'
+                             THEN 'SOLUTION'
+
+
+                         -- HOUSSE CAMERA
+                         WHEN UPPER(vpa.long_description) LIKE 'HOUSS%'
+                             AND UPPER(vpa.long_description) LIKE '%CAMERA%'
+                             THEN 'HOUSSE CAMERA'
+
+                         -- HOUSSE
+                         WHEN UPPER(vpa.long_description) LIKE 'HOUSS%'
+                             OR UPPER(vpa.long_description) LIKE 'COUVRE%POIGNEES%'
+                             THEN 'HOUSSE'
+
+                         -- LAMES/SCIE/FRAISE
+                         WHEN UPPER(vpa.long_description) LIKE 'LAME%'
+                             OR UPPER(vpa.long_description) LIKE 'FRAISE%'
+                             OR UPPER(vpa.long_description) LIKE 'CUTTER%'
+                             OR UPPER(vpa.long_description) LIKE 'COUTEAU%'
+                             OR UPPER(vpa.long_description) LIKE '%COUTEAU%SHAVER%'
+                             OR UPPER(vpa.long_description) LIKE '%SCIE'
+                             OR UPPER(vpa.long_description) LIKE 'LATARJET%SCIE%'
+                             OR UPPER(vpa.long_description) LIKE '385544'
+                             OR UPPER(vpa.long_description) LIKE 'BURSECTOR%'
+                             OR UPPER(vpa.long_description) LIKE 'FORMULA%COUTEAU%'
+                             OR UPPER(vpa.long_description) LIKE 'BROPHY%FRAISE%'
+                             OR UPPER(vpa.long_description) LIKE 'MINI%FRAISE%'
+                             OR UPPER(vpa.long_description) LIKE 'DRAIN%GA%6106%'
+                             OR UPPER(vpa.long_description) LIKE 'TPX%ROUTER%FRAISE%'
+                             OR UPPER(vpa.long_description) LIKE 'OUTIL%SHAVER%'
+                             OR UPPER(vpa.long_description) LIKE '%BLADE%' THEN 'LAME/SCIE/FRAISE'
+
+
+                         -- POCHE A INSTRUMENT
+                         WHEN UPPER(vpa.long_description) LIKE 'POCHE%INSTR%'
+                             OR UPPER(vpa.long_description) LIKE 'POCHE%705860-02%'
+                             THEN 'POCHE A INSTRUMENT'
+
+                         -- POCHE BISTOURI
+                         WHEN UPPER(vpa.long_description) LIKE 'POCHE%BIST%' THEN 'POCHE BISTOURI'
+
+                         -- POCHE
+                         WHEN UPPER(vpa.long_description) LIKE 'POCHE%' THEN 'POCHE'
+
+                         -- URIMETRE
+                         WHEN UPPER(vpa.long_description) LIKE '%URIMETRE%' THEN 'URIMETRE'
+
+                         -- PERFUSEUR
+                         WHEN UPPER(vpa.long_description) LIKE '%SAFESET%'
+                             OR UPPER(vpa.long_description) LIKE '%DIFFUSEUR%EASYPUMP%'
+                             THEN 'PERFUSEUR'
+
+                         -- ANSE
+                         WHEN UPPER(vpa.long_description) LIKE 'ANSE%'
+                             OR UPPER(vpa.long_description) LIKE 'CJADR223230NG20%'
+                             THEN 'ANSE'
+
+                         -- DRAIN
+                         WHEN UPPER(vpa.long_description) LIKE 'DRAIN%'
+                             OR UPPER(vpa.long_description) LIKE 'CYSTODRAIN%'
+                             OR UPPER(vpa.long_description) LIKE '%DRAINAGE%'
+                             OR UPPER(vpa.long_description) LIKE 'AERATEUR%'
+                             OR UPPER(vpa.long_description) LIKE '%DRAINAGE'
+                             OR UPPER(vpa.long_description) LIKE '%COELIODRAIN%'
+                             OR UPPER(vpa.long_description) LIKE '%SET%DRAINAGE%'
+                             THEN 'DRAIN'
+
+                         -- BANDE ESMARK
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%ESMARK%'
+                                 OR UPPER(vpa.long_description) LIKE '%ESMARCH%'
+                                  ) THEN 'BANDE ESMARK'
+
+                         -- BANDE CREPE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CREPE%'
+                                  ) THEN 'BANDE CREPE'
+
+                         -- BANDE CONTENTION
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE '%BANDE%'
+                                     AND UPPER(vpa.long_description) LIKE '%CONTENTION%'
+                                 )
+                                 OR UPPER(vpa.long_description) LIKE 'TENSOPLAST%'
+                                 OR UPPER(vpa.long_description) LIKE '%EXTENSOPLAST%7205704%'
+                             THEN 'BANDE CONTENTION'
+
+                         -- BANDE COMPRESSION RADIALE
+                         WHEN
+                             (
+                                 UPPER(vpa.long_description) LIKE '%BANDE%'
+                                     AND UPPER(vpa.long_description) LIKE '%COMPRESSION%RADIALE%'
+                                 )
+                                 OR UPPER(vpa.long_description) LIKE '%SRB24AC%'
+                                 OR UPPER(vpa.long_description) LIKE 'TR%BAND%COMPRESSION%'
+                                 OR UPPER(vpa.long_description) LIKE 'VELPEAU%'
+                             THEN 'BANDE COMPRESSION RADIALE'
+
+                         -- BANDE ADHESIVE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%ADHESIVE%'
+                                 OR UPPER(vpa.long_description) LIKE '%ADH%'
+                                  ) THEN 'BANDE ADHESIVE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%HYPAFIX%'
+                             THEN 'BANDE ADHESIVE'
+
+                         -- BANDE RESINE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%RESINE%'
+                                  ) THEN 'BANDE RESINE'
+
+                         -- BANDE PLATREE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%PLATREE%'
+                                  ) THEN 'BANDE PLATREE'
+
+                         -- BANDE ELASTIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDE%'
+                             AND (UPPER(vpa.long_description) LIKE '%ELASTIQUE%'
+                                  ) THEN 'BANDE ELASTIQUE'
+
+                         -- BANDE OUATEE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%BAND%'
+                                 AND UPPER(vpa.long_description) LIKE '%OUATE%')
+                                 OR
+                             UPPER(vpa.long_description) LIKE '%OUATE%'
+                             )
+                             THEN 'BANDE OUATEE'
+
+
+                         -- BANDE AUTRE
+                         WHEN UPPER(vpa.long_description) LIKE '%BAND%'
+                             OR UPPER(vpa.long_description) LIKE '%STOCKINETTE%'
+                             THEN 'BANDE AUTRE'
+
+                         -- BANDELETTE TRESSEE
+                         WHEN UPPER(vpa.long_description) LIKE '%RUBAN%COTON%B1095668%'
+                             THEN 'BANDELETTE TRESSEE'
+
+                         -- SET ENDOSCOPIE DIGESTIVE
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                                  AND (
+                                  UPPER(vpa.long_description) LIKE 'CHOLANGIOPANCREATOSCOPE%'
+                                      OR UPPER(vpa.long_description) LIKE '%MUCOSECTOMIE%'
+                                  )
+                             OR UPPER(vpa.long_description) LIKE 'CHOLANGIOPANCREATOSCOPE%'
+                             THEN 'SET ENDOSCOPIE DIGESTIVE'
+
+                         -- SET BADIGEON
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%BADIGEON%'
+                             THEN 'SET BADIGEON'
+
+                         -- SET DETERSION
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%DETERSION%'
+                             THEN 'SET DETERSION'
+
+                         -- SET INSUFLATION
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%INSUFFLATION%'
+                             THEN 'SET INSUFFLATION'
+
+                         -- SET GASTROSTOMIE
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%GASTROSTOMIE%'
+                             THEN 'SET GASTROSTOMIE'
+
+                         -- SET TRANSFERT
+                         WHEN (UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%TRANSFERT%')
+                             OR UPPER(vpa.long_description) LIKE 'TRANSOFIX%TRANSFERE%'
+                             THEN 'SET TRANSFERT'
+
+                         -- SET PONCTION OVOCYTES
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%OVOCYTES%'
+                             THEN 'SET PONCTION OVOCYTES'
+
+                         -- SET RECHAUFFEMENT SANG/LIQUIDE
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%RANGER%UNIQUE%'
+                             THEN 'SET RECHAUFFEMENT SANG/LIQUIDE'
+
+                         -- SET UROLOGIE
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%SONDAGE URINAIRE%'
+                                      OR UPPER(vpa.long_description) LIKE '%NEPHROST%'
+                                      OR UPPER(vpa.long_description) LIKE '%HOLEP%'
+                                      OR UPPER(vpa.long_description) LIKE '%SONDAGE%470058%'
+                                      OR UPPER(vpa.long_description) LIKE '%DRAINAGE%PUBIEN%'
+                                      OR UPPER(vpa.long_description) LIKE '%SONDAGE%'
+                                  )
+                             THEN 'SET UROLOGIE'
+
+                         -- SET MONITORAGE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%SET%'
+                                 AND UPPER(vpa.long_description) LIKE '%PRESSION%')
+                                 OR (UPPER(vpa.long_description) LIKE '%SET%'
+                                 AND UPPER(vpa.long_description) LIKE '%MONITORAGE%')
+                                 OR UPPER(vpa.long_description) LIKE '%COMBITRANS%'
+                             )
+                             THEN 'SET MONITORAGE'
+
+                         -- SET INFLATION
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%INFLATION%'
+                             THEN 'SET INFLATION'
+
+                         -- SET ANESTHESIE
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%ANESTHESIE%'
+                             THEN 'SET ANESTHESIE'
+
+                         -- SET EXPLANTATION
+                         WHEN UPPER(vpa.long_description) LIKE '%SET%'
+                             AND UPPER(vpa.long_description) LIKE '%EXPLANTATION%'
+                             THEN 'SET EXPLANTATION'
+
+                         -- SET OPHTALMOLOGIE
+                         WHEN UPPER(vpa.long_description) LIKE '%INFUSION ACTIVE%'
+                             AND UPPER(vpa.long_description) LIKE '%RETINE%'
+                             THEN 'SET OPHTALMOLOGIE'
+
+                         -- SET AUTRE
+                         WHEN UPPER(vpa.long_description) LIKE 'SET%' THEN 'SET'
+
+                         -- SAC EXTRACTION
+                         WHEN UPPER(vpa.long_description) LIKE 'SAC%EXTRACTION%'
+                             OR UPPER(vpa.long_description) LIKE 'SAC%EXTRATION%'
+                             OR UPPER(vpa.long_description) LIKE 'MEMOBAG%'
+                             OR UPPER(vpa.long_description) LIKE 'ENDOCATCH%'
+                             OR UPPER(vpa.long_description) LIKE '%MICKULICZ%'
+                             OR UPPER(vpa.long_description) LIKE 'PANIER%EXTRACTION%'
+                             OR UPPER(vpa.long_description) LIKE 'INZII%SAC%EXTRACTION%'
+                             OR UPPER(vpa.long_description) LIKE 'SACHET%ENDOSCOPIE%CD001%'
+                             THEN 'SAC EXTRACTION'
+
+                         -- PINCE
+                         WHEN UPPER(vpa.long_description) LIKE 'PINCE%'
+                             OR (vpa.long_description) LIKE '%PINCE%HEMOSTATIQUE%'
+                             OR (vpa.long_description) LIKE '%CLAMP%' THEN 'PINCE'
+
+                         -- PORTE LAME
+                         WHEN UPPER(vpa.long_description) LIKE 'PORTE%LAMES%'
+                             THEN 'PORTE LAMES'
+
+                         -- PIEGE A POLYPE
+                         WHEN UPPER(vpa.long_description) LIKE 'PIEGE%POLYPE%'
+                             OR UPPER(vpa.long_description) LIKE '%RECUPERATEUR%POLYPE%'
+                             THEN 'PIEGE A POLYPES'
+
+                         -- APPLICATEUR COLLE
+                         WHEN UPPER(vpa.long_description) LIKE 'APPLICATEUR%COLLE%'
+                             OR UPPER(vpa.long_description) LIKE 'APPLICATEUR%GLUBRAN%'
+                             THEN 'APPLICATEUR COLLE'
+
+                         -- RAPE
+                         WHEN UPPER(vpa.long_description) LIKE 'LATARJET%RAPE%' THEN 'RAPE'
+
+                         -- PISTOLET BIOPSIE
+                         WHEN UPPER(vpa.long_description) LIKE 'PISTOLET%BIOPS%'
+                             OR UPPER(vpa.long_description) LIKE 'TRU%CUT%BIOPSIE%'
+                             THEN 'PISTOLET BIOPSIE'
+
+                         -- TAPIS
+                         WHEN UPPER(vpa.long_description) LIKE 'TAPIS%ABSORBANT%' THEN 'TAPIS ABSORBANT'
+
+                         -- PATCH HEMOSTATIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'PATCH%HEMOSTATIQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'SURGICEL%CM%'
+                             THEN 'PATCH HEMOSTATIQUE'
+
+                         -- MANCHE BISTOURI
+                         WHEN UPPER(vpa.long_description) LIKE 'MANCHE%BISTOURI%'
+                             OR UPPER(vpa.long_description) LIKE 'MANCHE%BE%ASPI%'
+                             THEN 'MANCHE BISTOURI'
+
+                         -- BAGUETTE STERILE
+                         WHEN UPPER(vpa.long_description) LIKE 'BAGUETTE%STERILE%' THEN 'BAGUETTE STERILE'
+
+                         -- SPHINCTEROTOME / SPHINCTERROTOME
+                         WHEN UPPER(vpa.long_description) LIKE '%SPHINCTEROTOME%'
+                             OR UPPER(vpa.long_description) LIKE '%SPHINCTERROTOME%'
+                             OR UPPER(vpa.long_description) LIKE '%PAPILLOTOME%'
+                             THEN 'SPHINCTEROTOME'
+
+                         -- Par défaut premier mot
+                         ELSE SUBSTRING_INDEX(vpa.long_description, ' ', 1) END
+
+
+                 WHEN vpa.article_type_key = 'IMPLANTABLE_MEDICAL_DEVICE' THEN
+                     CASE
+                         -- ADAPTATEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'ADAPTATEUR%'
+                             OR UPPER(vpa.long_description) LIKE 'ADAPATEUR%'
+                             OR (UPPER(vpa.long_description) LIKE 'TRIATHLON%'
+                                 AND UPPER(vpa.long_description) LIKE '%ADAPTATEUR%')
+                             THEN 'ADAPTATEUR'
+
+                         -- BASE ANCRAGE
+                         WHEN UPPER(vpa.long_description) LIKE 'BASE ANCRAGE%'
+                             THEN 'BASE ANCRAGE'
+
+                         -- CIMENT
+                         WHEN UPPER(vpa.long_description) LIKE 'CIMENT%'
+                             THEN 'CIMENT'
+
+                         -- PROTHESE GENOU
+                         WHEN UPPER(vpa.long_description) LIKE '%ORIGIN PS FEMUR%'
+                             OR UPPER(vpa.long_description) LIKE '%ORIGIN PS TIBIA%'
+                             OR UPPER(vpa.long_description) LIKE '%ORIGIN PS FIXED INSERT%'
+                             OR UPPER(vpa.long_description) LIKE '%ORIGIN PS FEMUR CEMENTED%'
+                             OR UPPER(vpa.long_description) LIKE '%ORIGIN PATELLA CEMENTED%'
+                             OR UPPER(vpa.long_description) LIKE '%OXFORD III FEMUR%'
+                             OR UPPER(vpa.long_description) LIKE 'ORIGIN PS%'
+                             THEN 'SET PROTHESE GENOU'
+
+                         -- INSTRUMENTS CHIRURGICAUX / KITS D’INSTRUMENTS
+                         WHEN UPPER(vpa.long_description) LIKE '%INSTRUMENT%'
+                             OR UPPER(vpa.long_description) LIKE '%INSTRUMENT SET%'
+                             OR UPPER(vpa.long_description) LIKE '%TOOTHED RASP%'
+                             OR UPPER(vpa.long_description) LIKE '%FRAISE%'
+                             THEN ' SET INSTRUMENT CHIRURGICAL'
+
+                         -- SET DE PROTHESE PANCREATIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'SET%'
+                             AND  UPPER(vpa.long_description) LIKE '%PANCREATIQUE%'
+                             THEN 'SET PROTHESE PANCREATIQUE'
+
+                         -- SET DE PROTHESE BILIAIRE
+                         WHEN UPPER(vpa.long_description) LIKE 'SET%'
+                             AND  UPPER(vpa.long_description) LIKE '%BILIAIRE%'
+                             THEN 'SET PROTHESE BILIAIRE'
+
+                         -- COL DROIT
+                         WHEN (UPPER(vpa.long_description) LIKE 'COL%'
+                             AND UPPER(vpa.long_description) LIKE '%DROIT%')
+                             THEN 'COL DROIT'
+
+                         -- COL INCLINE
+                         WHEN (UPPER(vpa.long_description) LIKE 'COL%'
+                             AND UPPER(vpa.long_description) LIKE '%INCLINE%')
+                             THEN 'COL INCLINE'
+
+                         -- COL DECALE
+                         WHEN (UPPER(vpa.long_description) LIKE 'COL%'
+                             AND UPPER(vpa.long_description) LIKE '%DECALE%')
+                             THEN 'COL DECALE'
+
+                         -- ELECTRODE
+                         WHEN UPPER(vpa.long_description) LIKE '%ELECTRODE%'
+                             THEN 'ELECTRODE'
+
+                         -- FORET / MÈCHE CHIRURGICALE
+                         WHEN (
+                             UPPER(vpa.long_description) LIKE '%DRILL%'
+                                 OR UPPER(vpa.long_description) LIKE '%MÈCHE%'
+                                 OR UPPER(vpa.long_description) LIKE '%MECHE%'
+                             )
+                             THEN 'MECHE CHIRURGICALE'
+
+                         -- ANCRE DE SUTURE
+                         WHEN UPPER(vpa.long_description) LIKE '%ANCRE%'
+                             OR UPPER(vpa.long_description) LIKE '%SUTUREFIX%'
+                             OR UPPER(vpa.long_description) LIKE 'ANCRE%'
+                             OR UPPER(vpa.long_description) LIKE '%HEALICOIL%'
+                             OR UPPER(vpa.long_description) LIKE '%SWIVELOCK%'
+                             OR UPPER(vpa.long_description) LIKE '%PUSHLOCK%'
+                             OR UPPER(vpa.long_description) LIKE '%CORKSCREW%'
+                             OR UPPER(vpa.long_description) LIKE '%FAST-FIX%'
+                             OR UPPER(vpa.long_description) LIKE '%POUSSE NOEUD%'
+                             OR UPPER(vpa.long_description) LIKE '%IZI FIBER%'
+                             OR UPPER(vpa.long_description) LIKE '%ANCRAGE%'
+                             THEN 'ANCRE DE SUTURE'
+
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%TRIATHLON%'
+                                 OR UPPER(vpa.long_description) LIKE 'EMBASE TIBIALE%')
+                                 AND UPPER(vpa.long_description) LIKE '%CIMENTEE%'
+                                 AND UPPER(vpa.long_description) NOT LIKE '%NON CIMENTEE%'
+                             )
+                             THEN 'EMBASE TIBIALE CIMENTEE'
+
+                         -- EMBASE TIBIALE A CIMENTER
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%TRIATHLON%'
+                                 OR UPPER(vpa.long_description) LIKE 'EMBASE TIBIALE%')
+                                 AND UPPER(vpa.long_description) LIKE '%A CIMENTER%'
+                             )
+                             THEN 'EMBASE TIBIALE A CIMENTER'
+
+                         -- EMBASE / PARTIE TIBIALE
+                         WHEN UPPER(vpa.long_description) LIKE 'EMBASE TIBIALE%'
+                             OR (UPPER(vpa.long_description) LIKE 'TRIATHLON%'
+                                 AND UPPER(vpa.long_description) LIKE '%EMBASE TIBIALE%')
+                             OR (UPPER(vpa.long_description) LIKE 'NEXGEN%'
+                                 AND UPPER(vpa.long_description) LIKE '%TIBIALE%')
+                             THEN 'EMBASE TIBIALE'
+
+                         -- STENT CORONAIRE / ENDOPROTHESE VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%STENT%'
+                             OR UPPER(vpa.long_description) LIKE '%RESOLUTE ONYX%'
+                             OR UPPER(vpa.long_description) LIKE '%ONYX FRONTIER%'
+                             OR UPPER(vpa.long_description) LIKE '%COROFLEX ISAR NEO%'
+                             OR UPPER(vpa.long_description) LIKE '%ELUVIA%'
+                             OR UPPER(vpa.long_description) LIKE '%INNOVA-EU%'
+                             OR UPPER(vpa.long_description) LIKE '%SELF-EXPANDING%'
+                             OR UPPER(vpa.long_description) LIKE '%XIENCE SKYPOINT%'
+                             OR UPPER(vpa.long_description) LIKE '%SYNERGY MEGATRON%'
+                             OR UPPER(vpa.long_description) LIKE '%PAPYRUS%'
+                             OR UPPER(vpa.long_description) LIKE '%CGUARD CAROTID%'
+                             OR UPPER(vpa.long_description) LIKE '%SENT ORSIRO%'
+                             OR UPPER(vpa.long_description) LIKE '%OMNI ELITE%'
+                             OR UPPER(vpa.long_description) LIKE '%EXP SD VASCULAR%'
+                             THEN 'STENT'
+
+                         -- BANDELETTE UROLOGIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDELETTE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%TVT%'
+                                      OR UPPER(vpa.long_description) LIKE '%URO%'
+                                      OR UPPER(vpa.long_description) LIKE '%SLING%'
+                                      OR UPPER(vpa.long_description) LIKE '%ADVANTAGE%'
+                                  )
+                             THEN 'BANDELETTE UROLOGIQUE'
+
+                         -- BANDELETTE NON RESORBABLE
+                         WHEN UPPER(vpa.long_description) LIKE 'BANDELETTE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%NON RESORBABLE%'
+                                  )
+                             THEN 'BANDELETTE NON RESORBABLE'
+
+                         -- VIS
+                         WHEN UPPER(vpa.long_description) LIKE '%GAMMA 3%'
+                             AND UPPER(vpa.long_description) LIKE '%VIS%' THEN 'VIS'
+
+                         WHEN UPPER(vpa.long_description) LIKE 'VIS%'
+                             OR UPPER(vpa.long_description) LIKE '%SCREW%'
+                             THEN 'VIS'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%SERRATO%'
+                             AND UPPER(vpa.long_description) LIKE '%VIS%' THEN 'VIS'
+
+                         -- LIGAMENT DE RENFORT
+                         WHEN UPPER(vpa.long_description) LIKE '%LIGAMENT%'
+                             AND UPPER(vpa.long_description) LIKE '%RENFORT%'
+                             THEN 'LIGAMENT DE RENFORT'
+
+                         -- SUTURES
+                         WHEN UPPER(vpa.long_description) LIKE 'SUTURE%'
+                             OR UPPER(vpa.long_description) LIKE '%FIBER%'
+                             OR UPPER(vpa.long_description) LIKE '%SYST.%'
+                             THEN 'SUTURE CHIRURGICALE'
+
+                         -- LENTILLE
+                         WHEN UPPER(vpa.long_description) LIKE '%LENTILLE%'
+                             THEN 'LENTILLE INTRA OCULAIRE'
+
+                         -- COIL
+                         WHEN UPPER(vpa.long_description) LIKE '%COIL%'
+                             THEN 'COIL'
+
+                         -- AMPLATZER
+                         WHEN UPPER(vpa.long_description) LIKE '%AMPLATZER%'
+                             THEN 'AMPLATZER'
+
+                         -- PROTHESE BILIAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND UPPER(vpa.long_description) LIKE '%BILIAIRE%'
+                             THEN 'PROTHESE BILIAIRE'
+
+                         -- PROTHESE OESOPHAGIENNE
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND UPPER(vpa.long_description) LIKE '%OESOPHAG%'
+                             THEN 'PROTHESE OESOPHAGIENNE'
+
+                         -- PROTHESE ORTHOPEDIQUE – MAIN / POIGNET
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%MCP%'
+                                      OR UPPER(vpa.long_description) LIKE '%SCAPHO%'
+                                      OR UPPER(vpa.long_description) LIKE '%TRAPEZO%'
+                                      OR UPPER(vpa.long_description) LIKE '%STT%'
+                                      OR UPPER(vpa.long_description) LIKE '%KERIFLEX IPP%'
+                                  )
+                             THEN 'PROTHESE ARTICULAIRE MAIN/POIGNET'
+
+                         -- PROTHESE OTOLOGIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%OTOLOG%'
+                                      OR UPPER(vpa.long_description) LIKE '%OSSIC%'
+                                  )
+                             THEN 'PROTHESE OTOLOGIQUE'
+
+                         -- PROTHESE DE REFECTION
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%REFECTION%'
+                                      OR UPPER(vpa.long_description) LIKE '%SWING%'
+                                  )
+                             THEN 'PROTHESE DE REFECTION'
+
+                         -- BROCHE GUIDE
+                         WHEN UPPER(vpa.long_description) LIKE '%BROCHE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%GUIDE%'
+                                      OR UPPER(vpa.long_description) LIKE '%FLIPCUTTER%'
+                                  )
+                             THEN 'BROCHE GUIDE'
+
+                         -- GUIDES ORTHOPEDIQUES
+                         WHEN UPPER(vpa.long_description) LIKE '%GUIDE%'
+                             AND ( UPPER(vpa.long_description) LIKE '%CLOU%'
+                                 OR UPPER(vpa.long_description) LIKE '%PIN%'
+                                 OR UPPER(vpa.long_description) LIKE '%PROSTOP%'
+                                 OR UPPER(vpa.long_description) LIKE '%KNEE-PLAN%'
+                                  )
+                             THEN 'GUIDE ORTHOPEDIQUE'
+
+                         -- GUIDES CATHETER / VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%GUIDE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%CATHETER%'
+                                      OR UPPER(vpa.long_description) LIKE '%AIMANTE%'
+                                      OR UPPER(vpa.long_description) LIKE '%SELECTIF%'
+                                  )
+                             THEN 'GUIDE CATHETER'
+
+                         -- TETE DE PROTHESE
+                         WHEN (UPPER(vpa.long_description) LIKE '%TETE%'
+                             AND UPPER(vpa.long_description) LIKE '%BIOLOX%')
+                             OR UPPER(vpa.long_description) LIKE 'TETE%'
+                             THEN 'TETE PROTHESE'
+
+                         -- TIGE HEMRALE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             AND UPPER(vpa.long_description) LIKE '%HUMERALE%'
+                             THEN 'TIGE HUMERALE'
+
+                         -- TIGE METACARPIENNE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             AND UPPER(vpa.long_description) LIKE '%METACARPIENNE%'
+                             THEN 'TIGE METACARPIENNE'
+
+                         -- TIGE FEMORALE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             AND UPPER(vpa.long_description) LIKE '%FEMORALE%'
+                             THEN 'TIGE FEMORALE'
+
+                         -- TIGE CINTREE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             AND UPPER(vpa.long_description) LIKE '%CINTREE%'
+                             THEN 'TIGE CINTREE'
+
+                         -- TIGE COURTE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             AND UPPER(vpa.long_description) LIKE '%COURTE%'
+                             THEN 'TIGE COURTE'
+
+                         -- TIGE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIGE%'
+                             THEN 'TIGE'
+
+                         -- INSERT COTYLE DOUBLE MOBILITE
+                         WHEN (UPPER(vpa.long_description) LIKE '%INSERT%'
+                             AND UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND UPPER(vpa.long_description) LIKE '%DOUBLE MOBILITE%')
+                             THEN 'INSERT COTYLE DOUBLE MOBILITE'
+
+                         -- INSERT INVERSE (inversé / reversed)
+                         WHEN (UPPER(vpa.long_description) LIKE '%INSERT%'
+                             AND (
+                                   UPPER(vpa.long_description) LIKE '%INVERSE%'
+                                       OR UPPER(vpa.long_description) LIKE '%REVERSED%'
+                                   )
+                             )
+                             THEN 'INSERT INVERSE'
+
+                         -- INSERTS ROTULE
+                         WHEN UPPER(vpa.long_description) LIKE '%TRIATHLON'
+                             OR UPPER(vpa.long_description) LIKE '%ROTULE%'
+                             THEN 'INSERT ROTULE'
+
+                         -- INSERTS POUR COTYLE
+                         WHEN (UPPER(vpa.long_description) LIKE '%INSERT'
+                             AND UPPER(vpa.long_description) LIKE '%COTYLE%')
+                             THEN 'INSERT POUR COTYLE'
+
+                         -- INSERTS TIBIAL
+                         WHEN (UPPER(vpa.long_description) LIKE '%INSERT%'
+                             AND UPPER(vpa.long_description) LIKE '%TIBIAL%')
+                             OR (UPPER(vpa.long_description) LIKE 'TRIATHLON%'
+                                 AND UPPER(vpa.long_description) LIKE '%INSERT%'
+                                 AND UPPER(vpa.long_description) LIKE '%TIBIAL%')
+                             THEN 'INSERT TIBIAL'
+
+                         -- INSERTS FIXE
+                         WHEN (UPPER(vpa.long_description) LIKE '%INSERT%'
+                             AND UPPER(vpa.long_description) LIKE '%FIXE%')
+                             THEN 'INSERT FIXE'
+
+                         -- INSERTS (exclure COL DROIT)
+                         WHEN (
+                             (
+                                 UPPER(vpa.long_description) LIKE '%INSERT%'
+                                     OR UPPER(vpa.long_description) LIKE 'INSERT%'
+                                     OR (UPPER(vpa.long_description) LIKE 'ATTUNE%' AND UPPER(vpa.long_description) LIKE '%INSERT%')
+                                     OR (UPPER(vpa.long_description) LIKE 'TRIATHLON%' AND UPPER(vpa.long_description) LIKE '%INSERT%')
+                                     OR (UPPER(vpa.long_description) LIKE 'OXFORD%' AND UPPER(vpa.long_description) LIKE '%MENISQUE%')
+                                 )
+                                 AND UPPER(vpa.long_description) NOT LIKE '%COL DROIT%'
+                             )
+                             THEN 'INSERT'
+
+                         -- COTYLE DOUBLE MOBILITE NON CIMENTE
+                         WHEN UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND UPPER(vpa.long_description) LIKE '%DOUBLE MOBILITE%'
+                             AND UPPER(vpa.long_description) LIKE '%NON CIMENTE%'
+                             THEN 'COTYLE DOUBLE MOBILITE NON CIMENTE'
+
+                         -- COTYLE DOUBLE MOBILITE CIMENTE
+                         WHEN UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND UPPER(vpa.long_description) LIKE '%DOUBLE MOBILITE%'
+                             AND UPPER(vpa.long_description) LIKE '%CIMENTE%'
+                             THEN 'COTYLE DOUBLE MOBILITE CIMENTE'
+
+                         -- COTYLE NON CIMENTE
+                         WHEN UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND (UPPER(vpa.long_description) LIKE '%NON CIMENTE%'
+                                 OR UPPER(vpa.long_description) LIKE '%SANS-CIMENT%')
+                             THEN 'COTYLE NON CIMENTE'
+
+                         -- COTYLE CIMENTE
+                         WHEN UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CIMENTE%'
+                                 OR UPPER(vpa.long_description) LIKE '%A CIMENTE%')
+                             THEN 'COTYLE A CIMENTER'
+
+                         -- PARTICULES / MICROSPHERES POUR EMBOLISATION
+                         WHEN UPPER(vpa.long_description) LIKE '%HYDROPEARL%'
+                             OR UPPER(vpa.long_description) LIKE '%MICROSPHERE%'
+                             OR UPPER(vpa.long_description) LIKE '%EMBOLISATION%'
+                             OR UPPER(vpa.long_description) LIKE '%PARTICULE%'
+                             THEN 'MICROSPHERE'
+
+                         -- COTYLE SPECIFIQUE / CERAMIQUE / METAL HYPE
+                         WHEN UPPER(vpa.long_description) LIKE '%COTYLE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CERAMIQUE%'
+                                 OR UPPER(vpa.long_description) LIKE '%CERAMIC%'
+                                 OR UPPER(vpa.long_description) LIKE '%EXCUSIF%'
+                                 OR UPPER(vpa.long_description) LIKE '%METAL%')
+                             THEN 'COTYLE SPECIFIQUE'
+
+                         -- CHAMBRE VEINEUSE
+                         WHEN UPPER(vpa.long_description) LIKE 'CELSITE%'
+                             THEN 'CHAMBRE VEINEUSE'
+
+                         -- BROCHES
+                         WHEN UPPER(vpa.long_description) LIKE '%BROCHE%'
+                             OR UPPER(vpa.long_description) LIKE '%K-WIRE%'
+                             THEN 'BROCHE'
+
+                         -- STENT VASCULAIRE COUVERT
+                         WHEN UPPER(vpa.long_description) LIKE '%BEGRAFT%'
+                             OR UPPER(vpa.long_description) LIKE '%BEGRAFT%'
+                             OR UPPER(vpa.long_description) LIKE '%BEGRFAT%'
+                             THEN 'STENT COUVERT'
+
+                         -- STENT BILIAIRE / DIGESTIF
+                         WHEN UPPER(vpa.long_description) LIKE '%WALLFLEX%'
+                             AND (UPPER(vpa.long_description) LIKE '%BILIARY%' OR UPPER(vpa.long_description) LIKE '%COLONIC%')
+                             THEN 'STENT BILIAIRE'
+
+                         -- PLAQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%PLAQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'PLAQUE%'
+                             OR UPPER(vpa.long_description) LIKE '%PLAQUE CERVICALE%'
+                             THEN 'PLAQUE'
+
+                         -- SOLUTION VISCOELASTIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%DUOVISC%'
+                             THEN 'SOLUTION VISCOELASTIQUE'
+
+                         -- FONDS DE COTYLE
+                         WHEN UPPER(vpa.long_description) LIKE 'FOND DE COTYLE%'
+                             THEN 'FOND DE COTYLE'
+
+
+                         -- CALES / COMBLEMENT PROTHESE
+                         WHEN UPPER(vpa.long_description) LIKE 'DEMI CALE%'
+                             OR (UPPER(vpa.long_description) LIKE 'TRIATHLON%'
+                                 AND UPPER(vpa.long_description) LIKE '%CALE%'
+                                 AND UPPER(vpa.long_description) LIKE '%DEMI%')
+                             THEN 'DEMI CALE TIBIALE'
+
+                         -- CALES / COMBLEMENT PROTHESE
+                         WHEN UPPER(vpa.long_description) LIKE 'CALE%'
+                             OR UPPER(vpa.long_description) LIKE 'ATTUNE CALE%'
+                             OR (UPPER(vpa.long_description) LIKE 'NEXGEN%'
+                                 AND UPPER(vpa.long_description) LIKE '%CALE%')
+                             THEN 'CALE'
+
+                         -- BOUTON SEPTAL
+                         WHEN UPPER(vpa.long_description) LIKE 'BOUTON%'
+                             AND UPPER(vpa.long_description) LIKE '%SEPTAL%'
+                             THEN 'BOUTON SEPTAL'
+
+                         -- SURFACE ARTICULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE 'SURFACE%'
+                                  AND UPPER(vpa.long_description) LIKE '%ARTICULAIRE%'
+                             OR (UPPER(vpa.long_description) LIKE 'NEXGEN%'
+                                 AND UPPER(vpa.long_description) LIKE '%ARTICULAIRE%')
+                             OR (UPPER(vpa.long_description) LIKE 'PERSONA%'
+                                 AND UPPER(vpa.long_description) LIKE '%SURF%')
+                             OR (UPPER(vpa.long_description) LIKE 'PSN%'
+                                 AND UPPER(vpa.long_description) LIKE '%SURF%')
+                             THEN 'SURFACE ARTICULAIRE'
+
+                         -- ENDOBUTTON
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDOBUTTON%'
+                             OR UPPER(vpa.long_description) LIKE 'SURBOUTON%'
+                             OR UPPER(vpa.long_description) LIKE 'BOUTON DOGBONE%'
+                             THEN 'BOUTON FIXATION LIGAMENTAIRE'
+
+                         -- PROTHESE OESOPHAGIENNE
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDO%'
+                             AND UPPER(vpa.long_description) LIKE '%CLIP%'
+                             THEN 'CLIP ENDOSCOPIQUE'
+
+                         -- COMPOSANTS  FEMORAL CIMENTER
+                         WHEN UPPER(vpa.long_description) LIKE '%COMPOSANT%'
+                             AND UPPER(vpa.long_description) LIKE '%FEMORAL%'
+                             AND UPPER(vpa.long_description) LIKE '%CIMENTE%'
+                             THEN 'COMPOSANT FEMORAL A CIMENTER'
+
+                         -- COMPOSANTS  FEMORAL
+                         WHEN UPPER(vpa.long_description) LIKE '%COMPOSANT%'
+                             AND UPPER(vpa.long_description) LIKE '%FEMORAL%'
+                             THEN 'COMPOSANT FEMORAL'
+
+                         -- COMPOSANTS  CUBITAL
+                         WHEN UPPER(vpa.long_description) LIKE '%COMPOSANT%'
+                             AND UPPER(vpa.long_description) LIKE '%CUBITAL%'
+                             THEN 'COMPOSANT CUBITAL'
+
+                         -- COMPOSANTS  HUMERAL
+                         WHEN UPPER(vpa.long_description) LIKE '%COMPOSANT%'
+                             AND UPPER(vpa.long_description) LIKE '%HUMERAL%'
+                             THEN 'COMPOSANT HUMERAL'
+
+                         -- COMPOSANTS  TIBIALE
+                         WHEN UPPER(vpa.long_description) LIKE '%COMPOSANT%'
+                             AND UPPER(vpa.long_description) LIKE '%TIBIAL%'
+                             THEN 'COMPOSANT TIBIAL'
+
+                         -- CONDYLE PROTHESE FEMUR CIMENTEE
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE '%CONDYLE FÉMORAL%'
+                                      OR (UPPER(vpa.long_description) LIKE '%FEMUR%'
+                                      AND UPPER(vpa.long_description) LIKE '%PS%')
+                                      OR (UPPER(vpa.long_description) LIKE '%HEMICALE%'
+                                      AND UPPER(vpa.long_description) LIKE '%FEMORALE%')
+                                      OR (UPPER(vpa.long_description) LIKE '%TRIATHLON%'
+                                      AND UPPER(vpa.long_description) LIKE '%FEMORALE%')
+                                  )
+                             AND ( UPPER(vpa.long_description) LIKE '%CIMENT%'
+                                 OR UPPER(vpa.long_description) LIKE '%CEMENT%')
+                             THEN 'CONDYLE PROTHESE FEMUR A CIMENTER'
+
+                         -- CONDYLE PROTHESE FEMUR NON CIMENTEE
+                         WHEN (
+                                  UPPER(vpa.long_description) LIKE '%CONDYLE FÉMORAL%'
+                                      OR (UPPER(vpa.long_description) LIKE '%FEMUR%'
+                                      AND UPPER(vpa.long_description) LIKE '%PS%')
+                                      OR (UPPER(vpa.long_description) LIKE '%HEMICALE%'
+                                      AND UPPER(vpa.long_description) LIKE '%FEMORALE%')
+                                      OR (UPPER(vpa.long_description) LIKE '%TRIATHLON%'
+                                      AND UPPER(vpa.long_description) LIKE '%FEMORALE%')
+                                  )
+                             AND NOT (
+                                 UPPER(vpa.long_description) LIKE '%CIMENT%'
+                                     OR UPPER(vpa.long_description) LIKE '%CEMENT%'
+                                 )
+                             THEN 'CONDYLE PROTHESE FEMUR'
+
+                         -- KIT IMPLANT ORTHOPEDIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'KIT IMPLANT%'
+                             THEN 'KIT IMPLANT ORTHOPEDIQUE'
+
+                         -- KIT CHIRURGICAL
+                         WHEN UPPER(vpa.long_description) LIKE '%KIT%'
+                             THEN 'KIT CHIRURGIE'
+
+                         -- IMPLANT RENFORT
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT%'
+                             AND UPPER(vpa.long_description) LIKE '%RENFORT%'
+                             THEN 'IMPLANT DE RENFORT'
+
+                         -- IMPLANT FILETE
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT%'
+                             AND UPPER(vpa.long_description) LIKE '%FILETE%'
+                             AND UPPER(vpa.long_description) LIKE '%METACARPIEN%'
+                             THEN 'IMPLANT FILETE METACARPIEN'
+
+                         -- IMPLANT FILETE
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT%'
+                             AND UPPER(vpa.long_description) LIKE '%FILETE%'
+                             AND UPPER(vpa.long_description) LIKE '%RADIAL%'
+                             THEN 'IMPLANT FILETE RADIAL'
+
+                         -- IMPLANT DOME
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT DOME%'
+                             THEN 'IMPLANT DOME'
+
+                         -- IMPLANT MODULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%MUTARS%'
+                             OR UPPER(vpa.long_description) LIKE '%PIECE DE COUPLAGE%'
+                             OR UPPER(vpa.long_description) LIKE '%DOUBLE CONE%'
+                             THEN 'PROTHESE MODULAIRE'
+
+                         -- IMPLANT SCAPHOIDIEN
+                         WHEN UPPER(vpa.long_description) LIKE '%SCAPHOIDIEN%'
+                             OR UPPER(vpa.long_description) LIKE '%RCPI%'
+                             OR UPPER(vpa.long_description) LIKE '%SCAPHOIDE%'
+                             THEN 'IMPLANT SCAPHOIDIEN'
+
+                         -- IMPLANT TIBIAL
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT%'
+                             AND UPPER(vpa.long_description) LIKE '%TIBIAL%'
+                             THEN 'IMPLANT TIBIAL'
+
+                         -- PROTHESE FEMORO-PATELLAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%PATELLO FEMORAL%'
+                             OR UPPER(vpa.long_description) LIKE '%FEMORO PATELLAIRE%'
+                             THEN 'PROTHESE FEMORO-PATELLAIRE'
+
+                         -- IMPLANT ROTULIEN
+                         WHEN UPPER(vpa.long_description) LIKE 'IMPLANT ROTULIEN%'
+                             OR UPPER(vpa.long_description) LIKE '%PATELLA%'
+                             OR (
+                                  UPPER(vpa.long_description) LIKE 'ATTUNE MEDIALIZED%'
+                                      AND UPPER(vpa.long_description) LIKE '%PAT%')
+                             OR (
+                                  UPPER(vpa.long_description) LIKE 'NEXGEN%'
+                                      AND UPPER(vpa.long_description) LIKE '%ROTULE%')
+                             THEN 'IMPLANT ROTULIEN'
+
+                         -- IMPLANT INTRAMEDULLAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%IMPLANT%'
+                             AND UPPER(vpa.long_description) LIKE '%INTRAMEDULLAIRE%'
+                             THEN 'IMPLANT INTRAMEDULLAIRE'
+
+                         -- IMPLANT FUSION SPINALE / ARTHRODESE
+                         WHEN UPPER(vpa.long_description) LIKE '%X-FUSE%'
+                             THEN 'IMPLANT ARTHRODESE'
+
+                         WHEN UPPER(vpa.long_description) LIKE '%INDIVIDUAL HIP TIHA%'
+                             OR UPPER(vpa.long_description) LIKE '%MTP%'
+                             OR UPPER(vpa.long_description) LIKE '%FEMUR RHK%'
+                             THEN 'IMPLANT ORTHOPEDIQUE'
+
+                         -- IMPLANTS DE RENFORT / PATCHS / HERNIE
+                         WHEN UPPER(vpa.long_description) LIKE '%RENFORT%'
+                             OR UPPER(vpa.long_description) LIKE '%PROGRIP%'
+                             OR UPPER(vpa.long_description) LIKE '%PARIET%'
+                             OR UPPER(vpa.long_description) LIKE '%INTRAMESH%'
+                             OR UPPER(vpa.long_description) LIKE '%BIOMESH%'
+                             THEN 'IMPLANT DE RENFORT'
+
+                         -- IMPLANTS LIGAMENT / TENDON
+                         WHEN UPPER(vpa.long_description) LIKE '%TENDON%'
+                             OR UPPER(vpa.long_description) LIKE '%TENOLIG%'
+                             OR UPPER(vpa.long_description) LIKE '%TIGHTROPE%'
+                             OR UPPER(vpa.long_description) LIKE '%BIOINDUCTIVE%'
+                             THEN 'IMPLANT LIGAMENT / TENDON'
+
+                         -- IMPLANTS OCULAIRES
+                         WHEN UPPER(vpa.long_description) LIKE '%OCULAIRE%'
+                             OR UPPER(vpa.long_description) LIKE '%ACRYSOF%'
+                             OR UPPER(vpa.long_description) LIKE '%MONOFOCALE%'
+                             THEN 'IMPLANT OCULAIRE'
+
+                         -- IMPLANTS D'EMBOLISATION
+                         WHEN UPPER(vpa.long_description) LIKE '%ONYX%'
+                             THEN 'IMPLANT EMBOLISATION'
+
+                         -- IMPLANTS SPECIFIQUES (poignet, main)
+                         WHEN UPPER(vpa.long_description) LIKE '%PYROCARDAN%'
+                             OR UPPER(vpa.long_description) LIKE '%PROSTOP%'
+                             OR UPPER(vpa.long_description) LIKE '%PROTHESE METACARPIENNE%'
+                             OR UPPER(vpa.long_description) LIKE '%CHONDRAL%'
+                             OR UPPER(vpa.long_description) LIKE '%CAPFLEX%'
+                             THEN 'IMPLANT SPECIFIQUE'
+
+                         -- IMPLANTS TESTICULAIRE
+                         WHEN  UPPER(vpa.long_description) LIKE '%TESTICULAIRE%'
+                             THEN 'IMPLANT TESTICULAIRE'
+
+                         -- IMPLANTS PHONATOIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%PHONATOIRE%'
+                             THEN 'IMPLANT PHONATOIRE'
+
+                         -- IMPLANT SPINAL / LIAISON TRANSVERSE
+                         WHEN UPPER(vpa.long_description) LIKE '%LIAISON TRANSVERSE%'
+                             THEN 'IMPLANT SPINAL LIAISON TRANSVERSE'
+
+                         -- IMPLANT AUDITIF / OSEO-INTEGRE
+                         WHEN UPPER(vpa.long_description) LIKE '%BHX IMPLANT%'
+                             OR UPPER(vpa.long_description) LIKE '%PONTO%'
+                             THEN 'IMPLANT AUDITIF / OSEO-INTEGRE'
+
+                         -- EMBASE EPAULE CIMENTEE
+                         WHEN UPPER(vpa.long_description) LIKE '%GLENE 2 PLOTS%'
+                             AND UPPER(vpa.long_description) LIKE '%CIMENTEE%'
+                             AND UPPER(vpa.long_description) LIKE '%EPAULE%'
+                             THEN 'EMBASE GLENOIDE CIMENTEE'
+
+                         -- STIMULATEUR CARDIAQUE / PACEMAKER
+                         WHEN UPPER(vpa.long_description) LIKE 'STIMULATEUR CARDIAQUE%'
+                             OR UPPER(vpa.long_description) LIKE 'STIMULATEUR  CARDIAQUE%'
+                             THEN 'STIMULATEUR CARDIAQUE'
+
+                         -- SONDES STIMULATION CARDIAQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%SONDE%'
+                                  AND (UPPER(vpa.long_description) LIKE '%STIMULATION%'
+                                 OR UPPER(vpa.long_description) LIKE '%DEFIBRILLATION%'
+                                 OR UPPER(vpa.long_description) LIKE '%STRIMULATION%' )
+                             OR UPPER(vpa.long_description) LIKE '%SONDE SINUS CORONAIRE%'
+                             THEN 'SONDE CARDIAQUE'
+
+                         -- SONDE A VIS
+                         WHEN UPPER(vpa.long_description) LIKE 'SONDE A VIS%'
+                             THEN 'SONDE A VIS'
+
+
+                         -- DEFIBRILLATEUR CARDIAQUE IMPLANTABLE
+                         WHEN UPPER(vpa.long_description) LIKE '%DEFIBRILLATEUR%'
+                             THEN 'DEFIBRILLATEUR CARDIAQUE'
+
+
+                         -- TUTEUR / STENT URETERAL
+                         WHEN UPPER(vpa.long_description) LIKE '%TUTEUR URETERAL%'
+                             OR UPPER(vpa.long_description) LIKE '%STENT URETERAL%'
+                             THEN 'TUTEUR URETERAL'
+
+
+
+                         -- ENDOPROTHESE DUODENALE / GASTRO-INTESTINALE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%EVO-%'
+                                 AND UPPER(vpa.long_description) LIKE '%DUODENAL%')
+                                 OR UPPER(vpa.long_description) LIKE '%ENDOPROTHESE DUODENALE%'
+                             )
+                             THEN 'ENDOPROTHESE DUODENALE'
+
+                         -- ENDOPROTHESE CORONAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDOPROTHESE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CORONAIRE%'
+                                 OR UPPER(vpa.long_description) LIKE '%VIVO ISAR%'
+                                 OR UPPER(vpa.long_description) LIKE '%HT-SUPREME%'
+                                 OR UPPER(vpa.long_description) LIKE '%MYRA%')
+                             THEN 'ENDOPROTHESE CORONAIRE'
+
+                         -- ENDOPROTHESE CAROTIDIENNE
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDOPROTHESE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CAROTIDIENNE%'
+                                 OR UPPER(vpa.long_description) LIKE '%DSAVER%')
+                             THEN 'ENDOPROTHESE CAROTIDIENNE'
+
+                         -- Endoprothèses AAA
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDOPROTHESE%'
+                             AND (UPPER(vpa.long_description) LIKE '%AAA%'
+                                 OR UPPER(vpa.long_description) LIKE '%AORTIQUE%'
+                                 OR UPPER(vpa.long_description) LIKE '%EXCLUDER%'
+                                 OR UPPER(vpa.long_description) LIKE '%ZENITH%'
+                                 OR UPPER(vpa.long_description) LIKE '%BIFURQUE%'
+                                 OR UPPER(vpa.long_description) LIKE '%BIFURQUEE%'
+                                 OR UPPER(vpa.long_description) LIKE '%BIFURCATION%'
+                                 OR UPPER(vpa.long_description) LIKE '%ANACONDA%')
+                             THEN 'ENDOPROTHESE AAA'
+
+                         -- Endoprothèses AAA
+                         WHEN UPPER(vpa.long_description) LIKE 'TREO%'
+                             THEN 'ENDOPROTHESE AAA'
+
+
+                         -- ENDOPROTHESE vasculaire (aorte, carotides, bifurcation)
+                         WHEN UPPER(vpa.long_description) LIKE '%ENDOPROTHESE%'
+                             OR UPPER(vpa.long_description) LIKE '%ENDOPROTHÈSE%'
+                             OR UPPER(vpa.long_description) LIKE '%VIABAHN%'
+                             OR UPPER(vpa.long_description) LIKE '%TREO%'
+                             OR UPPER(vpa.long_description) LIKE '%PROTHESE ADVANIX%'
+                             THEN 'ENDOPROTHESE VASCULAIRE'
+
+
+                         -- PROTHESE VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%PROTHESE%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%VASC%'
+                                      OR UPPER(vpa.long_description) LIKE '%INTERGARD%'
+                                      OR UPPER(vpa.long_description) LIKE '%GELSOFT%'
+                                      OR UPPER(vpa.long_description) LIKE '%UNI-GRAFT%'
+                                      OR UPPER(vpa.long_description) LIKE '%ANNELEE%'
+                                      OR UPPER(vpa.long_description) LIKE '%BIFURQUEE%'
+                                  )
+                             AND UPPER(vpa.long_description) NOT LIKE '%ENDOPROTHESE%'
+                             THEN 'PROTHESE VASCULAIRE'
+
+
+
+                         -- COIN
+                         WHEN UPPER(vpa.long_description) LIKE '%COIN SPONGIEUX%'
+                             OR UPPER(vpa.long_description) LIKE '%COIN ARRONDI%'
+                             THEN 'IMPLANT COIN'
+
+                         -- CLOU
+                         WHEN (UPPER(vpa.long_description) LIKE '%GAMMA 3%'
+                             AND UPPER(vpa.long_description) LIKE '%CLOU%')
+                             OR (UPPER(vpa.long_description) LIKE '%T2 HUMERAL%'
+                                 AND UPPER(vpa.long_description) LIKE '%LONG%')
+                             OR (UPPER(vpa.long_description) LIKE '%T2 CLOU%')
+                             THEN 'CLOU'
+
+                         -- BALLONS ACTIFS
+                         WHEN UPPER(vpa.long_description) LIKE '%BALLON ACTIF%'
+                             OR UPPER(vpa.long_description) LIKE '%RANGER%'
+                             OR UPPER(vpa.long_description) LIKE '%PANTERA%'
+                             OR UPPER(vpa.long_description) LIKE '%SEQUENT%'
+                             OR UPPER(vpa.long_description) LIKE '%LUTONIX%'
+                             OR UPPER(vpa.long_description) LIKE '%BALLON IN%'
+                             OR UPPER(vpa.long_description) LIKE '%ATLAS%'
+                             OR UPPER(vpa.long_description) LIKE '%LUTONIX%'
+                             OR UPPER(vpa.long_description) LIKE '%MAGICTOUCH%'
+                             THEN 'BALLON ACTIF'
+
+                         -- Composants glénoïdiens pour prothèse d'épaule
+                         WHEN UPPER(vpa.long_description) LIKE '%PLATINE GLENOIDIENNE%'
+                             OR UPPER(vpa.long_description) LIKE '%PLATINE FULL WEDGE%'
+                             OR UPPER(vpa.long_description) LIKE '%PLATINE HALF WEDGE%'
+                             OR UPPER(vpa.long_description) LIKE '%PLATINE STANDARD%'
+                             OR UPPER(vpa.long_description) LIKE '%PLATINE LATERALISEE%'
+                             THEN 'PLATINE GLENOIDE'
+
+                         -- FILS / TROCARES
+                         WHEN UPPER(vpa.long_description) LIKE '%KIRSCHNER%'
+                             THEN 'FILS / TROCARES ORTHOPEDIE'
+
+                         -- CONE TIBIAL
+                         WHEN UPPER(vpa.long_description) LIKE '%CONE%'
+                             AND UPPER(vpa.long_description) LIKE '%TIB%'
+                             THEN 'CONE TIBIAL'
+
+                         -- QUILLE
+                         WHEN UPPER(vpa.long_description) LIKE 'QUILLE%'
+                             OR UPPER(vpa.long_description) LIKE '%QUILLE TIBIAL%'
+                             THEN 'QUILLE'
+
+                         -- MAILLE HERNIAIRE
+                         WHEN (UPPER(vpa.long_description) LIKE '%PROLENE%'
+                             AND UPPER(vpa.long_description) LIKE '%HERNIE%')
+                             OR (UPPER(vpa.long_description) LIKE '%COMPOSITE%'
+                                 AND UPPER(vpa.long_description) LIKE '%VENTRAL%')
+                             OR UPPER(vpa.long_description) LIKE '%PROMESH%'
+                             THEN 'MAILLE HERNIAIRE'
+
+                         -- GREFFON OSSEUX / SUBSTITUT OSSEUX
+                         WHEN UPPER(vpa.long_description) LIKE '%GREFFON OSSEUX%'
+                             OR UPPER(vpa.long_description) LIKE '%OSTEOPURE%'
+                             OR UPPER(vpa.long_description) LIKE '%SHELL CLUSTER%'
+                             OR UPPER(vpa.long_description) LIKE '%NANOGEL%'
+                             OR UPPER(vpa.long_description) LIKE '%COPEAUX%'
+                             OR UPPER(vpa.long_description) LIKE '%COLLAPAT%'
+                             THEN 'GREFFON OSSEUX'
+
+                         -- FEMUR ELEMENT NON CIMENTE
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%FEMUR%'
+                                 OR UPPER(vpa.long_description) LIKE '%FÉMORAL%')
+                                 AND (UPPER(vpa.long_description) LIKE '%NON CIMENTE%')
+                             )
+                             THEN 'FEMUR NON CIMENTE'
+
+                         -- FEMUR ELEMENT A CIMENTER
+                         WHEN (
+                             (UPPER(vpa.long_description) LIKE '%FEMUR%'
+                                 OR UPPER(vpa.long_description) LIKE '%FÉMORAL%')
+                                 AND (UPPER(vpa.long_description) LIKE '%A CIMENTER%'
+                                 OR UPPER(vpa.long_description) LIKE '%À CIMENTER%'
+                                 OR UPPER(vpa.long_description) LIKE '%A-CIMENTER%')
+                             )
+                             THEN 'FEMUR ELEMENT A CIMENTER'
+
+                         -- FEMUR ELEMENT CIMENTEE
+                         WHEN UPPER(vpa.long_description) LIKE '%CORPS ENDO%'
+                             OR UPPER(vpa.long_description) LIKE '%CORPS PROXIMAL%'
+                             OR UPPER(vpa.long_description) LIKE '%CORPS ENDOPROTHESE%'
+                             THEN 'CORPS ENDOPROTHESE'
+
+                         WHEN ( (UPPER(vpa.long_description) LIKE '%FEMUR%'
+                             OR UPPER(vpa.long_description) LIKE '%FÉMORAL%')
+                             AND (UPPER(vpa.long_description) LIKE '%CIMENTE%'
+                                 OR UPPER(vpa.long_description) LIKE '%CIMENTEE%') )
+                             THEN 'FEMUR ELEMENT CIMENTEE'
+
+
+                         -- TIBIA PROTHESE CIMENTE
+                         WHEN UPPER(vpa.long_description) LIKE '%TIB%'
+                             AND (
+                                  UPPER(vpa.long_description) LIKE '%CIMENTE%'
+                                      OR UPPER(vpa.long_description) LIKE '%BASE CIMENTEE%'
+                                      OR UPPER(vpa.long_description) LIKE '%EMBASE CIMENTEE%'
+                                      OR UPPER(vpa.long_description) LIKE '%CEMENTED%'
+                                  )
+                             THEN 'TIBIA PROTHESE A CIMENTER'
+
+                         -- TIBIA PROTHESE NON CIMENTEE
+                         WHEN (UPPER(vpa.long_description) LIKE '%TIB SLV%'
+                             OR UPPER(vpa.long_description) LIKE '%TIBIA%')
+                             AND ( UPPER(vpa.long_description) LIKE '%SANS CIMENT%'
+                                 OR NOT UPPER(vpa.long_description) LIKE '%CIMENT%')
+                             THEN 'TIBIA PROTHESE NON CIMENTEE'
+
+                         -- FEMUR / PK FEMUR non cimenté
+                         WHEN UPPER(vpa.long_description) LIKE '%PK FEMUR%'
+                             THEN 'PK FEMUR NON CIMENTE'
+
+                         -- TIBIA / PK TIBIA non cimenté
+                         WHEN UPPER(vpa.long_description) LIKE '%PK TIBIA%'
+                             THEN 'PK TIBIA NON CIMENTE'
+
+                         -- AGRAFEUSE CHIRURGICALE
+                         WHEN UPPER(vpa.long_description) LIKE '%AGRAFEUSE%'
+                             OR UPPER(vpa.long_description) LIKE '%GIA%'
+                             THEN 'AGRAFEUSE'
+
+                         -- PLATEFORME PROTHESE EPAULE INVERSEE
+                         WHEN UPPER(vpa.long_description) LIKE '%PLATEFORME REVERSED%'
+                             THEN 'PLATEFORME PROTHESE EPAULE INVERSEE'
+
+                         -- ENVELOPPE CARDIAQUE ANTIBACTERIENNE
+                         WHEN UPPER(vpa.long_description) LIKE '%ENVELOPPE ANTIBACT%'
+                             THEN 'ENVELOPPE CARDIAQUE ANTIBACTERIENNE'
+
+                         -- INTRODUCTEUR
+                         WHEN UPPER(vpa.long_description) LIKE '%INTRODUCTEUR%'
+                             THEN 'INTRODUCTEUR'
+
+                         -- BALLON D'OCCLUSION
+                         WHEN UPPER(vpa.long_description) LIKE '%MOLDING OCCLUSION BALLOON%'
+                             OR UPPER(vpa.long_description) LIKE '%FOGARTY OCCLUSION%'
+                             THEN 'BALLON OCCLUSION'
+
+                         -- CAGE INTERSOMATIQUE / IMPLANT RACHIDIEN
+                         WHEN UPPER(vpa.long_description) LIKE '%PIT''STOP%'
+                             OR UPPER(vpa.long_description) LIKE '%CAGE%'
+                             OR UPPER(vpa.long_description) LIKE '%PEEK%'
+                             THEN 'CAGE INTERSOMATIQUE'
+
+                         -- CABLE / FIL DE CERCLAGE
+                         WHEN UPPER(vpa.long_description) LIKE '%CABLE%'
+                             AND (UPPER(vpa.long_description) LIKE '%CERCLAGE%'
+                                 OR UPPER(vpa.long_description) LIKE '%DALL MILES%')
+                             THEN 'CABLE CERCLAGE'
+
+                         -- CABLE NEUROSTIMULATION
+                         WHEN UPPER(vpa.long_description) LIKE '%CABLE%'
+                             AND UPPER(vpa.long_description) LIKE '%NEUROSTIMULATION%'
+                             THEN 'CABLE NEUROSTIMULATION'
+
+                         -- BOUCLE AIGUILLE
+                         WHEN UPPER(vpa.long_description) LIKE '%BOUCLE AIGUILLEE%'
+                             OR UPPER(vpa.long_description) LIKE '%BOUCLE AIGUILLE%'
+                             THEN 'BOUCLE AIGUILLEE'
+
+                         -- BOUCHON OBTURATEUR
+                         WHEN UPPER(vpa.long_description) LIKE 'BOUCHON%'
+                             THEN 'BOUCHON OBTURATEUR'
+
+                         -- CATHETER
+                         WHEN UPPER(vpa.long_description) LIKE '%CATHETER%'
+                             OR UPPER(vpa.long_description) LIKE '%VIATRAC%'
+                             OR UPPER(vpa.long_description) LIKE '%BARRX%'
+                             OR UPPER(vpa.long_description) LIKE '%CATHÉTER%'
+                             THEN 'CATHETER'
+
+                         -- CALOTTE HUMERALE
+                         WHEN UPPER(vpa.long_description) LIKE '%CALOTTE%'
+                             AND UPPER(vpa.long_description) LIKE '%HUMERALE%'
+                             THEN 'CALOTTE HUMERALE'
+
+                         -- ECROU
+                         WHEN UPPER(vpa.long_description) LIKE '%ECROU%'
+                             THEN 'ECROU'
+
+                         -- CONNECTEUR RACHIDIEN / SPINAL
+                         WHEN UPPER(vpa.long_description) LIKE '%CONNECTEUR TRANSVERSE%'
+                             THEN 'CONNECTEUR RACHIDIEN'
+
+                         -- PATCH CAROTIDE/VASCULAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%HEMACAROTID PATCH%'
+                             OR UPPER(vpa.long_description) LIKE '%VASCULAR-PATCH%'
+                             THEN 'PATCH VASCULAIRE/CAROTIDE'
+
+                         -- PATCH BIOLOGIQUE
+                         WHEN UPPER(vpa.long_description) LIKE 'PATCH BIOLOGIQUE%'
+                             THEN 'PATCH BIOLOGIQUE'
+
+                         -- MONITEUR CARDIAQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%MONITEUR%'
+                             AND UPPER(vpa.long_description) LIKE '%CARDIAQUE%'
+                             THEN 'MONITEUR CARDIAQUE'
+
+                         -- NOYAU DOUBLE MOBILITE
+                         WHEN UPPER(vpa.long_description) LIKE '%NOYAU DOUBLE MOBILITE%'
+                             THEN 'NOYAU DOUBLE MOBILITE'
+
+                         -- PION / FIXATION CUPULE HANCHE
+                         WHEN UPPER(vpa.long_description) LIKE '%PION FIXATION%'
+                             THEN 'FIXATION CUPULE HANCHE'
+
+                         -- FIXATION DE GLENE
+                         WHEN UPPER(vpa.long_description) LIKE '%FIXATION%'
+                             AND UPPER(vpa.long_description) LIKE '%GLENE%'
+                             THEN 'FIXATION DE GLENE'
+
+                         -- ELECTRODE
+                         WHEN UPPER(vpa.long_description) LIKE '%ELECTRODE%'
+                             THEN 'ELECTRODE'
+
+                         -- GLENE A QUILLE
+                         WHEN UPPER(vpa.long_description) LIKE '%GLENE A QUILLE%'
+                             THEN 'GLENE A QUILLE'
+
+                         -- CROIX KERBOULL POUR PROTHESE EPAULE
+                         WHEN UPPER(vpa.long_description) LIKE '%KERBOULL%'
+                             THEN 'CROIX KERBOULL'
+
+                         -- GLENOSPHERE
+                         WHEN UPPER(vpa.long_description) LIKE '%GLENOSPHERE%'
+                             OR UPPER(vpa.long_description) LIKE '%SPHERE GLENOIDIENNE%'
+                             THEN 'SPHERE GLENOIDIENNE'
+
+                         -- EMBASE GLENOIDE
+                         WHEN UPPER(vpa.long_description) LIKE '%EMBASE GLENOIDIENNE%'
+                             AND UPPER(vpa.long_description) LIKE '%SANS CIMENT%'
+                             THEN 'EMBASE GLENOIDE SANS CIMENT'
+
+                         -- ATHÉRECTOMIE CORONAIRE / ROTABLATOR
+                         WHEN UPPER(vpa.long_description) LIKE '%ROTA PRO%'
+                             OR UPPER(vpa.long_description) LIKE '%ROTABLATOR PRO%'
+                             THEN 'ROTABLATOR CORONAIRE'
+
+                         -- ESPACEUR HUMERAL
+                         WHEN UPPER(vpa.long_description) LIKE '%ESPACEUR%'
+                             AND UPPER(vpa.long_description) LIKE '%HUMERAL%'
+                             THEN 'ESPACEUR HUMERAL'
+
+                         -- RECHARGES INSTRUMENT CHIRURGICAL
+                         WHEN UPPER(vpa.long_description) LIKE '%RECHARGE SUREFORM%'
+                             OR UPPER(vpa.long_description) LIKE '%LAME DE SCIE%'
+                             THEN 'RECHARGE INSTRUMENT CHIRURGICAL'
+
+                         -- CUPULE
+                         WHEN UPPER(vpa.long_description) LIKE '%CUPULE%'
+                             THEN 'CUPULE'
+
+                         -- PRESS FIT POST
+                         WHEN UPPER(vpa.long_description) LIKE '%PRESS FIT%'
+                             AND UPPER(vpa.long_description) LIKE '%POST%'
+                             THEN 'PRESS FIT POST'
+
+                         -- BASE D'ANCRAGE ORTHOPÉDIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%BASE ANCRAGE%'
+                             OR UPPER(vpa.long_description) LIKE '%EASYTECH%'
+                             THEN 'BASE ANCRAGE ORTHOPÉDIQUE'
+
+                         -- BANDELETTE ORTHOPEDIQUE
+                         WHEN UPPER(vpa.long_description) LIKE '%BANDELETTE%'
+                                  AND (
+                                  UPPER(vpa.long_description) LIKE '%TLS%'
+                                      OR UPPER(vpa.long_description) LIKE '%ORTHO%'
+                                      OR UPPER(vpa.long_description) LIKE '%LIGAMENT%'
+                                  )
+                             OR UPPER(vpa.long_description) LIKE '%SMART TAPE%'
+                             THEN 'BANDELETTE ORTHOPEDIQUE'
+
+                         -- PROTHESE DISCALE (rachis lombaire / cervical)
+                         WHEN UPPER(vpa.long_description) LIKE '%PRODISC%'
+                             OR UPPER(vpa.long_description) LIKE '%DISC%'
+                             OR UPPER(vpa.long_description) LIKE '%ENDPLATE%'
+                             OR UPPER(vpa.long_description) LIKE '%INLAY%'
+                             THEN 'PROTHESE DISCALE'
+
+                         -- GREFFON BIOLOGIQUE / BANQUE DE TISSUS
+                         WHEN UPPER(vpa.long_description) LIKE '%FASCIA LATA%'
+                             OR UPPER(vpa.long_description) LIKE '%FASCIA%'
+                             OR UPPER(vpa.long_description) LIKE '%OSTEO BANQUE%'
+                             OR UPPER(vpa.long_description) LIKE '%EXTENSEUR HALLUX%'
+                             OR UPPER(vpa.long_description) LIKE '1'
+                             OR UPPER(vpa.long_description) LIKE 'ALLOGREFFON%'
+                             THEN 'GREFFON BIOLOGIQUE'
+
+                         -- CANULE
+                         WHEN UPPER(vpa.long_description) LIKE '%CANULE%'
+                             THEN 'CANULE'
+
+                         -- ANNEAU DE SOUTIEN (ORTHOPEDIQUE HANCHE)
+                         WHEN UPPER(vpa.long_description) LIKE '%ANNEAU DE SOUTIEN%'
+                             AND UPPER(vpa.long_description) LIKE '%HANCHE%'
+                             THEN 'ANNEAU DE SOUTIEN'
+
+                         -- ANNEAU DE TENSION CAPSULAIRE (IMPLANT OCULAIRE)
+                         WHEN UPPER(vpa.long_description) LIKE '%TENSION CAPSULAIRE%'
+                             OR UPPER(vpa.long_description) LIKE '%CAPSULAIRE%'
+                             THEN 'ANNEAU DE TENSION CAPSULAIRE'
+
+                         -- MANCHETTE URINAIRE
+                         WHEN UPPER(vpa.long_description) LIKE '%MANCHETTE%'
+                             AND UPPER(vpa.long_description) LIKE '%URINAIRE%'
+                             THEN 'MANCHETTE URINIAIRE'
+
+                         -- POMPE URINAIRE IMPLANTABLE
+                         WHEN UPPER(vpa.long_description) LIKE '%POMPE DE CONTROLE%'
+                             THEN 'POMPE URINAIRE'
+
+                         -- BALLON PRESSION UROLOGIE
+                         WHEN UPPER(vpa.long_description) LIKE '%BALLON%'
+                             AND UPPER(vpa.long_description) LIKE '%AMS800%'
+                             THEN 'BALLON DE PRESSION UROLOGIE'
+
+                         ELSE SUBSTRING_INDEX(vpa.long_description, ' ', 1) END
+                 ELSE SUBSTRING_INDEX(vpa.long_description, ' ', 1)
+                 END AS `categorie_article`,
+
+             vpa.article_type_key AS `type_article`,
+
+             COUNT(*) AS nb_article,
+             SUM(vpa.price_incl_tax )AS  cout_article,
+
+             -- Cout non refacturable effectif
+             SUM(vpa.price_incl_tax)
+                 - SUM(
+                     CASE
+                         WHEN vpa.lpp_code IS NOT NULL
+                             AND vpa.lpp_code NOT IN ('3126109','3127445','3161689','3117783','3175533','3126724','3188151',
+                                                      '3172463','3126026','3142930','3177696','3121187','3180468','3155588',
+                                                      '3184147','3101820','3119300','3165977','3126262','3156903','3117412',
+                                                      '3146483','3101486','3108169','3175332','3128953','3122181','3141764',
+                                                      '3190219','3112900','3108241','3116192','3163582','3134132','3116766',
+                                                      '3126776','3182705','3115940','3121075','3129912','3101983','3152609',
+                                                      '3122442','3132860','3125475','3121980','3186608','3140701','3102876',
+                                                      '3141356','3129770','3159304','3131010','3199580','3157825','3136467',
+                                                      '3116909','3131978','3107922','3164446','3126782','3133227','3112834',
+                                                      '3131576','3143906','3123677','3192276','3175450','3146218','3110663',
+                                                      '3141215','3192075','3109571','3187341','3107997','3178224','3134422',
+                                                      '3188429','3110120','3128893','3179258','3115235','3175208','3136154',
+                                                      '3124599','3180250','3191160','3109230','3145578','3175473','3111869',
+                                                      '3125587','3118222','3172055','3148418','3197612','3154382','3185684',
+                                                      '3189593','3163903','3140612','3176691','3117286','3123967','3119240',
+                                                      '3193608','3111993','3111272','3191472','3113153','3162157','3135338',
+                                                      '3182289','3164185','3185193','3192796','3195607','3128597','3180020',
+                                                      '3185320','3137308','3160135','3106213','3138549','3107939','3182384',
+                                                      '3180623','3153081','3107827','3100618','3133552','3196630','3192069',
+                                                      '3161844','3109878','3101138','3117292','3166184','3132297','3114017',
+                                                      '3120207','3127050','3101010','3158322','3156850','3141853','3179146',
+                                                      '3116789','3153840','3115181','3149932','3160626','3136450','3113087',
+                                                      '3170926','3110255','3148393','3132104','3167611','3146320','3125191',
+                                                      '3182898','3185589','3129728','3115590','3148401','3163398','3122689',
+                                                      '3153856','3136881','3159907','3107891','3129438','3134735','3165641',
+                                                      '3122092','3116186','3102043','3106207','3152785','3113437','3130542',
+                                                      '5213143', '5234240','5214450','5235021','5102722','5189700','5294443'
+                                 )
+                             THEN vpa.price_incl_tax
+                         ELSE 0
+                         END
+                   ) AS Cout_non_refacturable,
+
+             -- cout refacturable effectif
+             SUM(
+                     CASE
+                         WHEN vpa.lpp_code IS NOT NULL
+                             AND vpa.lpp_code NOT IN (
+                                                      '3126109','3127445','3161689','3117783','3175533','3126724','3188151',
+                                                      '3172463','3126026','3142930','3177696','3121187','3180468','3155588',
+                                                      '3184147','3101820','3119300','3165977','3126262','3156903','3117412',
+                                                      '3146483','3101486','3108169','3175332','3128953','3122181','3141764',
+                                                      '3190219','3112900','3108241','3116192','3163582','3134132','3116766',
+                                                      '3126776','3182705','3115940','3121075','3129912','3101983','3152609',
+                                                      '3122442','3132860','3125475','3121980','3186608','3140701','3102876',
+                                                      '3141356','3129770','3159304','3131010','3199580','3157825','3136467',
+                                                      '3116909','3131978','3107922','3164446','3126782','3133227','3112834',
+                                                      '3131576','3143906','3123677','3192276','3175450','3146218','3110663',
+                                                      '3141215','3192075','3109571','3187341','3107997','3178224','3134422',
+                                                      '3188429','3110120','3128893','3179258','3115235','3175208','3136154',
+                                                      '3124599','3180250','3191160','3109230','3145578','3175473','3111869',
+                                                      '3125587','3118222','3172055','3148418','3197612','3154382','3185684',
+                                                      '3189593','3163903','3140612','3176691','3117286','3123967','3119240',
+                                                      '3193608','3111993','3111272','3191472','3113153','3162157','3135338',
+                                                      '3182289','3164185','3185193','3192796','3195607','3128597','3180020',
+                                                      '3185320','3137308','3160135','3106213','3138549','3107939','3182384',
+                                                      '3180623','3153081','3107827','3100618','3133552','3196630','3192069',
+                                                      '3161844','3109878','3101138','3117292','3166184','3132297','3114017',
+                                                      '3120207','3127050','3101010','3158322','3156850','3141853','3179146',
+                                                      '3116789','3153840','3115181','3149932','3160626','3136450','3113087',
+                                                      '3170926','3110255','3148393','3132104','3167611','3146320','3125191',
+                                                      '3182898','3185589','3129728','3115590','3148401','3163398','3122689',
+                                                      '3153856','3136881','3159907','3107891','3129438','3134735','3165641',
+                                                      '3122092','3116186','3102043','3106207','3152785','3113437','3130542',
+                                                      '5213143', '5234240','5214450','5235021','5102722','5189700','5294443'
+                                 )
+                             THEN vpa.price_incl_tax
+                         ELSE 0
+                         END
+             ) AS Cout_refacturable_effectif
+
+         FROM ehtrace_CLP.surgery_item si
+
+                  INNER JOIN ehtrace_CLP.versioned_provider_article vpa
+                             ON vpa.id = si.versioned_provider_article_id
+
+             -- Dernière version modified surgery patient pour un meme id
+                  INNER JOIN (
+             SELECT surgery_id, MAX(modified) AS max_modified
+             FROM ehtrace_CLP.surgery_patient
+             GROUP BY surgery_id
+         ) sp_max ON sp_max.surgery_id = si.surgery_id
+                  INNER JOIN ehtrace_CLP.surgery_patient sp
+                             ON sp.surgery_id = sp_max.surgery_id
+                                 AND sp.modified = sp_max.max_modified
+
+             -- Dernière version modified surgery pour un meme id
+                  INNER JOIN (
+             SELECT id, MAX(modified) AS max_modified
+             FROM ehtrace_CLP.surgery
+             GROUP BY id
+         ) s_max ON s_max.id = si.surgery_id
+                  INNER JOIN ehtrace_CLP.surgery s
+                             ON s.id = s_max.id
+                                 AND s.modified = s_max.max_modified
+
+             -- Dernière version  modified de first_surgery_act pour un meme id
+                  INNER JOIN (
+             SELECT surgery_id, MAX(modified) AS max_modified
+             FROM ehtrace_CLP.first_surgery_act
+             GROUP BY surgery_id
+         ) fo_max ON fo_max.surgery_id = s.id
+                  INNER JOIN ehtrace_CLP.first_surgery_act fo
+                             ON fo.surgery_id = fo_max.surgery_id
+                                 AND fo.modified = fo_max.max_modified
+
+                  INNER JOIN ehtrace_CLP.surgery_operator so
+                             ON so.surgery_id = s.id
+
+                  LEFT JOIN medecin_specialite ms
+                            ON ms.med = UPPER(
+                                    REPLACE(
+                                            REPLACE(
+                                                    TRIM(REGEXP_REPLACE(so.full_name, '\\(.*\\)', '')),
+                                                    ' ', ''),
+                                            '-', '')
+                                        )
+
+         WHERE sp.stay_number IS NOT NULL -- code sejour non nul
+           AND s.surgery_date >= MAKEDATE(YEAR(CURDATE()), 1) -- a partir de 2026
+           AND vpa.long_description IS NOT NULL -- description DM non null
+           #    AND vpa.article_type_key <> 'DRUG'
+           AND si.status_key ='USED'
+           AND fo.surgical_procedure_name IS NOT NULL -- nom de procédure non null
+           AND ms.specialite_medecin = 'CARDIO' -- specialité ortho
+
+         GROUP BY sp.stay_number,
+                  fo.surgical_procedure_name,
+                  so.full_name,
+                  ms.specialite_medecin,
+                  fo.surgical_specialty_name,
+                  s.surgery_date,
+                  vpa.article_type_key,
+                  categorie_article,
+                  vpa.article_type_key
+
+     ),
+
+     -- CTE pour compter le nombre total de séjours par groupe
+     sejours_totaux AS (
+         SELECT
+             Intervention,
+             operateur,
+             specialite_medecin,
+             specialite_acte,
+             COUNT(DISTINCT code_sejour) AS total_sejours
+         FROM articles_par_sejour
+         GROUP BY Intervention, operateur, specialite_medecin, specialite_acte
+     ),
+
+     total_par_groupe AS (
+         SELECT
+             Intervention,
+             operateur,
+             specialite_medecin,
+             specialite_acte,
+             categorie_article,
+             SUM(cout_article) AS cout_total,
+             SUM(Cout_non_refacturable) AS cout_non_refacturable,
+             SUM(Cout_refacturable_effectif) AS cout_refacturable
+         FROM articles_par_sejour
+         GROUP BY Intervention, operateur, specialite_medecin, specialite_acte, categorie_article
+
+     )
+
+SELECT
+    t.cout_non_refacturable AS `Coût nonrefacturables TTC`,
+    t.cout_refacturable AS `Coût refacturables TTC`,
+    t.cout_total AS `Coût global TTC`,
+    t.categorie_article AS `Catégorie`,
+    a.`type_article` AS Nature,
+#    ROUND(COUNT(DISTINCT a.code_sejour) * 100 / st.total_sejours, 1) AS `Pourcentage utilisation (%)`,
+    ROUND(SUM(a.nb_article) / st.total_sejours,1)  AS `Nombre moyen / séjour`,
+    ROUND(t.cout_total /  st.total_sejours,1)  AS `Coût moyen / séjour`,
+    t.Intervention AS `Motif intervention`,
+    t.operateur AS `Opérateurs`,
+    t.specialite_medecin AS `Spécialité médecin`,
+    t.specialite_acte AS `Spécialité acte ethrace`,
+    COUNT(DISTINCT a.code_sejour) AS `Séjours concernés`,
+    st.total_sejours AS `Nombre total de séjours`,
+    SUM(a.nb_article) AS `Nombre total utilisés`
+
+FROM articles_par_sejour a
+         INNER JOIN total_par_groupe t
+                    ON t.Intervention = a.Intervention
+                        AND t.operateur = a.operateur
+                        AND t.specialite_medecin = a.specialite_medecin
+                        AND t.specialite_acte = a.specialite_acte
+                        AND t.categorie_article = a.categorie_article
+         INNER JOIN sejours_totaux st
+                    ON st.Intervention = a.Intervention
+                        AND st.operateur = a.operateur
+                        AND st.specialite_medecin = a.specialite_medecin
+                        AND st.specialite_acte = a.specialite_acte
+GROUP BY
+    t.Intervention,
+    t.operateur,
+    t.specialite_medecin,
+    t.specialite_acte,
+    t.categorie_article,
+    st.total_sejours,
+    a.type_article,
+    t.cout_total,
+    t.cout_non_refacturable,
+    t.cout_refacturable
+ORDER BY t.Intervention;
+```
