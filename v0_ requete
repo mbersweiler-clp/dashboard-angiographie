@@ -1,0 +1,332 @@
+```sql
+WITH medecin_specialite AS (
+    SELECT DISTINCT
+        referring_doctor_formatted_fullname AS med,
+        CASE
+            WHEN LEFT(referring_doctor_firstname,6) IN (
+                                                        'Barbar','Dautel','Dederi','Detamm','Maschi','Lozano'
+                )
+                THEN 'CHIR MAIN'
+            ELSE referring_doctor_specialty
+            END AS specialite_medecin
+    FROM apigem_clp.clinical_patient_stay
+)
+
+SELECT
+    ROUND(SUM(Cout_total - Cout_refacturable_effectif), 1) AS `Coût total articles non refacturables TTC`, -- les DMI considérés non refacturables
+    ROUND(SUM(Cout_refacturable_effectif), 1)    AS `Coût total articles refacturables TTC`, -- DMI exclu du refacturable
+    ROUND(SUM(Cout_total), 1)           AS `Coût global TTC`,
+
+    ROUND(AVG(Cout_total), 1)      AS `Coût global moyen / séjours`,
+    ROUND(AVG(Cout_DM), 1)        AS `Coût moyen DM / séjours`,
+    ROUND(AVG(Cout_DMI), 1)       AS `Coût moyen DMI / séjours`,
+    ROUND(AVG(Cout_MED), 1)       AS `Coût moyen Médicaments / séjours`,
+
+    ROUND(AVG(Cout_total - Cout_refacturable_effectif), 1) AS `Coût global moyen non refacturables / séjours`,
+
+    Intervention AS `Motifs interventions`,
+    Operateur AS `Opérateurs`,
+   specialite_medecin AS `Spécialité médecin`,
+   specialite_acte AS `Spécialité acte`,
+
+    COUNT(*)                      AS `Nombre de séjours`,
+    SUM(nb_total_article - nb_total_refacturable_effectif) AS `Nombre articles non refacturables`,
+    SUM(nb_total_refacturable_effectif)    AS `Nombre articles refacturables`,
+    SUM(nb_total_article)         AS `Nombre total articles`,
+    SUM(nb_total_DM)              AS `Nombre total DM`,
+    SUM(nb_total_DMI)             AS `Nombre total DMI`,
+    SUM(nb_total_MED)             AS `Nombre total Médicaments`,
+
+
+    ROUND(AVG(nb_total_article),0) AS `Nombre moyen articles utilisés / séjours`
+
+FROM (
+         SELECT
+
+             COALESCE((
+                          SELECT
+                              CASE
+                                  -- S'il existe au moins un DMI dans le séjour
+                                  WHEN EXISTS (
+                                      SELECT 1
+                                      FROM ehtrace_CLP.surgery_item si2
+                                               JOIN ehtrace_CLP.versioned_provider_article vpa2
+                                                    ON vpa2.id = si2.versioned_provider_article_id
+                                      WHERE si2.surgery_id = s.id
+                                        AND si2.status_key = 'USED'
+                                        AND vpa2.article_type_key = 'IMPLANTABLE_MEDICAL_DEVICE'
+                                        AND vpa2.long_description IS NOT NULL
+                                  )
+                                      THEN
+                                      -- Refacturable = LPP hors DMI
+                                      SUM(
+                                              CASE
+                                                  WHEN vpa.lpp_code IS NOT NULL
+                                                      AND vpa.lpp_code NOT IN (
+                                                                               '3126109','3127445','3161689','3117783','3175533','3126724','3188151',
+                                                                               '3172463','3126026','3142930','3177696','3121187','3180468','3155588',
+                                                                               '3184147','3101820','3119300','3165977','3126262','3156903','3117412',
+                                                                               '3146483','3101486','3108169','3175332','3128953','3122181','3141764',
+                                                                               '3190219','3112900','3108241','3116192','3163582','3134132','3116766',
+                                                                               '3126776','3182705','3115940','3121075','3129912','3101983','3152609',
+                                                                               '3122442','3132860','3125475','3121980','3186608','3140701','3102876',
+                                                                               '3141356','3129770','3159304','3131010','3199580','3157825','3136467',
+                                                                               '3116909','3131978','3107922','3164446','3126782','3133227','3112834',
+                                                                               '3131576','3143906','3123677','3192276','3175450','3146218','3110663',
+                                                                               '3141215','3192075','3109571','3187341','3107997','3178224','3134422',
+                                                                               '3188429','3110120','3128893','3179258','3115235','3175208','3136154',
+                                                                               '3124599','3180250','3191160','3109230','3145578','3175473','3111869',
+                                                                               '3125587','3118222','3172055','3148418','3197612','3154382','3185684',
+                                                                               '3189593','3163903','3140612','3176691','3117286','3123967','3119240',
+                                                                               '3193608','3111993','3111272','3191472','3113153','3162157','3135338',
+                                                                               '3182289','3164185','3185193','3192796','3195607','3128597','3180020',
+                                                                               '3185320','3137308','3160135','3106213','3138549','3107939','3182384',
+                                                                               '3180623','3153081','3107827','3100618','3133552','3196630','3192069',
+                                                                               '3161844','3109878','3101138','3117292','3166184','3132297','3114017',
+                                                                               '3120207','3127050','3101010','3158322','3156850','3141853','3179146',
+                                                                               '3116789','3153840','3115181','3149932','3160626','3136450','3113087',
+                                                                               '3170926','3110255','3148393','3132104','3167611','3146320','3125191',
+                                                                               '3182898','3185589','3129728','3115590','3148401','3163398','3122689',
+                                                                               '3153856','3136881','3159907','3107891','3129438','3134735','3165641',
+                                                                               '3122092','3116186','3102043','3106207','3152785','3113437', '3130542',
+                                                                               '5213143', '5234240','5214450','5235021','5102722','5189700','5294443'
+                                                          )
+                                                      THEN vpa.price_incl_tax
+                                                  ELSE 0
+                                                  END
+                                      )
+                                  ELSE
+                                      -- Pas de DMI tout le LPP est refacturable
+                                      SUM(
+                                              CASE
+                                                  WHEN vpa.lpp_code IS NOT NULL
+                                                      THEN vpa.price_incl_tax
+                                                  ELSE 0
+                                                  END
+                                      )
+                                  END
+                          FROM ehtrace_CLP.surgery_item si
+                                   JOIN ehtrace_CLP.versioned_provider_article vpa
+                                        ON vpa.id = si.versioned_provider_article_id
+                          WHERE si.surgery_id = s.id
+                            AND si.status_key = 'USED'
+                            AND vpa.long_description IS NOT NULL
+                      ), 0) AS Cout_refacturable_effectif,
+
+
+             sp.stay_number AS code_sejour,
+             fo.surgical_procedure_name AS Intervention,
+             s.id AS surgery_id,
+             so.full_name AS Operateur,
+
+             ms.specialite_medecin AS specialite_medecin,
+             fo.surgical_specialty_name AS specialite_acte,
+
+             (
+                 SELECT SUM(vpa.price_incl_tax)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+             ) AS Cout_total,
+
+
+             (
+                 SELECT
+                     CASE
+                         -- S'il existe au moins un DMI dans le séjour
+                         WHEN EXISTS (
+                             SELECT 1
+                             FROM ehtrace_CLP.surgery_item si2
+                                      JOIN ehtrace_CLP.versioned_provider_article vpa2
+                                           ON vpa2.id = si2.versioned_provider_article_id
+                             WHERE si2.surgery_id = s.id
+                               AND si2.status_key = 'USED'
+                               AND vpa2.article_type_key = 'IMPLANTABLE_MEDICAL_DEVICE'
+                               AND vpa2.long_description IS NOT NULL
+                         )
+                             THEN
+                             -- Compte LPP hors DMI
+                             SUM(
+                                     CASE
+                                         WHEN vpa.lpp_code IS NOT NULL
+                                             AND vpa.lpp_code NOT IN (
+                                                                      '3126109','3127445','3161689','3117783','3175533','3126724','3188151',
+                                                                      '3172463','3126026','3142930','3177696','3121187','3180468','3155588',
+                                                                      '3184147','3101820','3119300','3165977','3126262','3156903','3117412',
+                                                                      '3146483','3101486','3108169','3175332','3128953','3122181','3141764',
+                                                                      '3190219','3112900','3108241','3116192','3163582','3134132','3116766',
+                                                                      '3126776','3182705','3115940','3121075','3129912','3101983','3152609',
+                                                                      '3122442','3132860','3125475','3121980','3186608','3140701','3102876',
+                                                                      '3141356','3129770','3159304','3131010','3199580','3157825','3136467',
+                                                                      '3116909','3131978','3107922','3164446','3126782','3133227','3112834',
+                                                                      '3131576','3143906','3123677','3192276','3175450','3146218','3110663',
+                                                                      '3141215','3192075','3109571','3187341','3107997','3178224','3134422',
+                                                                      '3188429','3110120','3128893','3179258','3115235','3175208','3136154',
+                                                                      '3124599','3180250','3191160','3109230','3145578','3175473','3111869',
+                                                                      '3125587','3118222','3172055','3148418','3197612','3154382','3185684',
+                                                                      '3189593','3163903','3140612','3176691','3117286','3123967','3119240',
+                                                                      '3193608','3111993','3111272','3191472','3113153','3162157','3135338',
+                                                                      '3182289','3164185','3185193','3192796','3195607','3128597','3180020',
+                                                                      '3185320','3137308','3160135','3106213','3138549','3107939','3182384',
+                                                                      '3180623','3153081','3107827','3100618','3133552','3196630','3192069',
+                                                                      '3161844','3109878','3101138','3117292','3166184','3132297','3114017',
+                                                                      '3120207','3127050','3101010','3158322','3156850','3141853','3179146',
+                                                                      '3116789','3153840','3115181','3149932','3160626','3136450','3113087',
+                                                                      '3170926','3110255','3148393','3132104','3167611','3146320','3125191',
+                                                                      '3182898','3185589','3129728','3115590','3148401','3163398','3122689',
+                                                                      '3153856','3136881','3159907','3107891','3129438','3134735','3165641',
+                                                                      '3122092','3116186','3102043','3106207','3152785','3113437','3130542',
+                                                                      '5213143', '5234240','5214450','5235021','5102722','5189700','5294443'
+                                                 )
+                                             THEN 1
+                                         ELSE 0
+                                         END
+                             )
+                         ELSE
+                             -- Pas de DMI tous les LPP sont refacturables
+                             SUM(
+                                     CASE
+                                         WHEN vpa.lpp_code IS NOT NULL
+                                             THEN 1
+                                         ELSE 0
+                                         END
+                             )
+                         END
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+             ) AS nb_total_refacturable_effectif,
+
+             (
+                 SELECT COUNT(*)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+             ) AS nb_total_article,
+
+             (
+                 SELECT COUNT(*)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'MEDICAL_DEVICE'
+             ) AS nb_total_DM,
+
+             (
+                 SELECT COUNT(*)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'IMPLANTABLE_MEDICAL_DEVICE'
+             ) AS nb_total_DMI,
+
+             (
+                 SELECT COUNT(*)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'DRUG'
+             ) AS nb_total_MED,
+
+
+             (
+                 SELECT SUM(vpa.price_incl_tax)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'MEDICAL_DEVICE'
+             ) AS Cout_DM,
+
+             (
+                 SELECT SUM(vpa.price_incl_tax)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'IMPLANTABLE_MEDICAL_DEVICE'
+             ) AS Cout_DMI,
+
+             (
+                 SELECT SUM(vpa.price_incl_tax)
+                 FROM ehtrace_CLP.surgery_item si
+                          JOIN ehtrace_CLP.versioned_provider_article vpa
+                               ON vpa.id = si.versioned_provider_article_id
+                 WHERE si.surgery_id = s.id
+                   AND si.status_key = 'USED'
+                   AND vpa.long_description IS NOT NULL
+                   AND vpa.article_type_key = 'DRUG'
+             ) AS Cout_MED
+
+         FROM ehtrace_CLP.surgery s
+                  -- Filtre versioning SURGERY
+                  INNER JOIN (
+             SELECT id, MAX(modified) AS max_modified FROM ehtrace_CLP.surgery GROUP BY id
+         ) s_max ON s.id = s_max.id AND s.modified = s_max.max_modified
+
+             --  Filtre versioning SURGERY_PATIENT
+                  INNER JOIN ehtrace_CLP.surgery_patient sp ON sp.surgery_id = s.id
+                  INNER JOIN (
+             SELECT surgery_id, MAX(modified) AS max_modified FROM ehtrace_CLP.surgery_patient GROUP BY surgery_id
+         ) sp_max ON sp.surgery_id = sp_max.surgery_id AND sp.modified = sp_max.max_modified
+
+             -- Filtre versioning FIRST_SURGERY_ACT
+                  INNER JOIN ehtrace_CLP.first_surgery_act fo ON fo.surgery_id = s.id
+                  INNER JOIN (
+             SELECT surgery_id, MAX(modified) AS max_modified FROM ehtrace_CLP.first_surgery_act GROUP BY surgery_i
+         ) fo_max ON fo.surgery_id = fo_max.surgery_id AND fo.modified = fo_max.max_modified
+                  JOIN ehtrace_CLP.surgery_operator so ON so.surgery_id = s.id
+
+                  LEFT JOIN medecin_specialite ms
+                            ON ms.med = UPPER(
+                                    REPLACE(
+                                            REPLACE(
+                                                    TRIM(REGEXP_REPLACE(so.full_name, '\\(.*\\)', '')),
+                                                    ' ', ''),
+                                            '-', '')
+                                        )
+
+         WHERE s.provider_id = '0d6266ce-90bc-4724-b10e-5577b29fa1a1' -- CLP
+           AND s.surgery_date >= MAKEDATE(YEAR(CURDATE()), 1) -- A partir du 1er janvier 2026
+           AND sp.stay_number IS NOT NULL -- code séjour non null
+           AND fo.surgical_procedure_name IS NOT NULL -- nom de procédure non null
+     ) t
+
+WHERE
+    specialite_medecin = 'CARDIO'
+
+GROUP BY
+    Intervention,
+    Operateur,
+    specialite_medecin, 
+    specialite_acte
+
+HAVING COUNT(*) >= 1
+
+ORDER BY
+    Intervention,
+    Operateur;
+
+```
